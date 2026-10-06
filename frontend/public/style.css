@@ -435,6 +435,21 @@ a { color: inherit; }
 .dashboard-action.primary { border: 0; background: var(--accent); color: #fff; }
 .dashboard-action.secondary { border: 1px solid var(--border2); color: var(--text2); background: var(--surface2); }
 .dashboard-action:hover { filter: brightness(1.1); }
+.workspace-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.workspace-card { min-width: 0; padding: 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.workspace-copy { color: var(--text2); font-size: .8rem; margin: -.5rem 0 1rem; }
+.workspace-form { display: flex; gap: .5rem; }
+.workspace-form input { min-width: 0; flex: 1; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text); padding: .55rem .65rem; font-size: .75rem; }
+.workspace-output { min-height: 2rem; margin-top: .85rem; font-size: .75rem; }
+.leaderboard-row { display: flex; justify-content: space-between; gap: .75rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
+.leaderboard-row:last-child { border-bottom: 0; }
+.leaderboard-row strong { color: var(--text); font-size: .75rem; }
+.leaderboard-row span { color: var(--text3); font-size: .68rem; text-align: right; }
+.comparison-workspace { display: flex; flex-direction: column; gap: 1rem; }
+.comparison-user { position: relative; }
+.comparison-user.winner { border-color: rgba(50,213,131,.45); box-shadow: 0 0 0 1px rgba(50,213,131,.12); }
+.comparison-user.winner::after { content: "LEADING"; position: absolute; top: .75rem; right: .75rem; color: var(--success); font: 600 .58rem var(--font-sans); letter-spacing: .08em; }
+.comparison-user b { color: var(--text); font-family: var(--font-display); }
 .rank-badge {
   background: rgba(124,106,255,0.12);
   border: 1px solid rgba(124,106,255,0.2);
@@ -781,6 +796,8 @@ a { color: inherit; }
   .preview-stats div:nth-child(2) { border-right: 0; }
   .preview-stats div:nth-child(-n+2) { padding-bottom: .75rem; border-bottom: 1px solid var(--border); }
   .feature-grid { grid-template-columns: 1fr; }
+  .workspace-grid { grid-template-columns: 1fr; }
+  .workspace-form { flex-direction: column; }
   .site-footer { display: block; }.footer-links { margin-top: 1rem; }
 }
 @keyframes shimmer {

@@ -320,7 +320,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
     </div>
 
     <!-- Solved Rings -->
-    <div class="solved-section">
+    <div class="solved-section" id="dashboard-overview">
       <div class="section-title">// problems solved</div>
       <div class="rings-row">
         ${ringHTML("easy",   "ring-easy")}
@@ -357,7 +357,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
     </div>
 
     <!-- Streak & Heatmap -->
-    <div class="streak-section">
+    <div class="streak-section" id="dashboard-activity">
       <div class="section-title">// activity</div>
       <div class="streak-row">
         <div class="streak-pill">
@@ -386,7 +386,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
     </div>
 
     <!-- Topics -->
-    <div class="analytics-section">
+    <div class="analytics-section" id="dashboard-topics">
       <div class="section-title">// topic strengths</div>
       <div class="topic-layout">
         <div class="topic-bars">
@@ -398,7 +398,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
             </div>`).join("") || `<div class="empty-state">No topic data available.</div>`}
         </div>
 
-        <div class="analytics-section">
+        <div class="analytics-section" id="dashboard-progress">
           <div class="section-title">// progress history</div>
           ${progress.length > 1 ? `
             <div class="progress-chart">
@@ -413,13 +413,13 @@ function render(userData, calData, recentData, username, progress = [], recommen
             </div>` : `<div class="muted">Daily snapshots will build this chart over time.</div>`}
         </div>
 
-        <div class="analytics-section">
+        <div class="analytics-section" id="dashboard-study">
           <div class="section-title">// recommended practice</div>
           <div class="recommendation-list">
             ${recommendations.map(problem => `<a class="recommendation-item" href="${problem.url}" target="_blank" rel="noopener"><strong>${escapeHTML(problem.title)}</strong><span>${escapeHTML(problem.topic)} · ${escapeHTML(problem.difficulty)}</span></a>`).join("") || `<div class="muted">No recommendations available.</div>`}
           </div>
 
-          <div class="analytics-section">
+          <div class="analytics-section" id="dashboard-platforms">
             <div class="section-title">// coding profile</div>
             <div id="platform-summary" class="muted">Loading Codeforces, CodeChef and GitHub…</div>
             <a class="study-plan-btn export-link" href="/api/user/${encodeURIComponent(username)}/report.pdf">Download PDF report</a>
@@ -435,7 +435,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
     </div>
 
     <!-- Contest history -->
-    <div class="analytics-section">
+    <div class="analytics-section" id="dashboard-contest">
       <div class="section-title">// contest rating</div>
       <div class="contest-summary">
         <div><strong>${analytics.contests?.contestsAttended || 0}</strong><span>attended</span></div>
@@ -461,9 +461,29 @@ function render(userData, calData, recentData, username, progress = [], recommen
     </div>
 
     <!-- Recent Submissions -->
-    <div class="recent-section">
+    <div class="recent-section" id="dashboard-recent">
       <div class="section-title">// recent submissions</div>
       <div class="recent-list">${recentHTML}</div>
+    </div>
+    <div class="workspace-grid">
+      <section class="workspace-card" id="dashboard-leaderboard">
+        <div class="section-title">// leaderboard</div>
+        <p class="workspace-copy">Create a group code and compare progress with your cohort.</p>
+        <div class="workspace-form">
+          <input id="group-code-input" maxlength="32" placeholder="Group code" aria-label="Group code" />
+          <button id="leaderboard-btn" class="dashboard-action primary" type="button">View group</button>
+        </div>
+        <div id="leaderboard-output" class="workspace-output muted">No group loaded yet.</div>
+      </section>
+      <section class="workspace-card" id="dashboard-settings">
+        <div class="section-title">// goals & settings</div>
+        <p class="workspace-copy">Set a daily solving target for ${escapeHTML(username)}.</p>
+        <div class="workspace-form">
+          <input id="daily-goal-input" type="number" min="1" max="100" value="1" aria-label="Daily solving target" />
+          <button id="goal-btn" class="dashboard-action primary" type="button">Save goal</button>
+        </div>
+        <div id="goal-output" class="workspace-output muted">Loading goal…</div>
+      </section>
     </div>
     </div>
   `;
@@ -529,6 +549,58 @@ async function fetchAll(username) {
         event.currentTarget.disabled = false;
       }
     });
+    const goalOutput = document.getElementById("goal-output");
+    fetch(`${API_BASE}/api/user/${encodeURIComponent(username)}/goal`)
+      .then(response => response.json().then(data => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.message || data.error || "Unable to load goal.");
+        const goal = data.goal || {};
+        const goalInput = document.getElementById("daily-goal-input");
+        if (goal.dailyTarget) goalInput.value = goal.dailyTarget;
+        goalOutput.textContent = goal.dailyTarget ? `${goal.dailyTarget} problem${goal.dailyTarget === 1 ? "" : "s"} per day` : "No daily goal set.";
+      })
+      .catch(error => { goalOutput.textContent = error.message; });
+    document.getElementById("goal-btn")?.addEventListener("click", async event => {
+      const goalInput = document.getElementById("daily-goal-input");
+      const dailyTarget = Number(goalInput.value);
+      event.currentTarget.disabled = true;
+      try {
+        const response = await fetch(`${API_BASE}/api/user/${encodeURIComponent(username)}/goal`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dailyTarget, remindersEnabled: false }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || "Unable to save goal.");
+        goalOutput.textContent = `Saved: ${data.goal.dailyTarget} problem${data.goal.dailyTarget === 1 ? "" : "s"} per day`;
+      } catch (error) {
+        goalOutput.textContent = error.message;
+      } finally {
+        event.currentTarget.disabled = false;
+      }
+    });
+    document.getElementById("leaderboard-btn")?.addEventListener("click", async event => {
+      const code = document.getElementById("group-code-input").value.trim();
+      const output = document.getElementById("leaderboard-output");
+      if (!/^[a-zA-Z0-9_-]{3,32}$/.test(code)) {
+        output.textContent = "Use a group code with 3–32 letters, numbers, _ or -.";
+        return;
+      }
+      event.currentTarget.disabled = true;
+      output.textContent = "Loading group…";
+      try {
+        const response = await fetch(`${API_BASE}/api/groups/${encodeURIComponent(code)}/leaderboard`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || "Unable to load leaderboard.");
+        output.innerHTML = data.leaderboard.length
+          ? data.leaderboard.map((member, index) => `<div class="leaderboard-row"><strong>#${index + 1} @${escapeHTML(member.username)}</strong><span>${member.solved} solved · ${member.streak} day streak</span></div>`).join("")
+          : "No members in this group yet.";
+      } catch (error) {
+        output.textContent = error.message;
+      } finally {
+        event.currentTarget.disabled = false;
+      }
+    });
   } catch (err) {
     results.innerHTML = `
       <div class="empty-state">
@@ -568,16 +640,21 @@ compareBtn.addEventListener("click", async () => {
     const response = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(first)}/${encodeURIComponent(second)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || data.error || "Unable to compare profiles.");
+    const [firstUser, secondUser] = data.users;
+    const winner = (a, b, key) => Number(a[key] || 0) >= Number(b[key] || 0) ? "winner" : "";
     results.innerHTML = `
+      <div class="comparison-workspace">
+        <div class="dashboard-intro"><div><span class="section-kicker">Compare</span><h2>Head-to-head progress</h2></div><span class="ui-badge">Live comparison</span></div>
       <div class="analytics-section">
         <div class="section-title">// head-to-head</div>
         <div class="comparison-grid">${data.users.map(user => `
-          <div class="comparison-user">
+          <div class="comparison-user ${user === firstUser ? winner(firstUser, secondUser, "solved") : winner(secondUser, firstUser, "solved")}">
             <strong>@${escapeHTML(user.username)}</strong>
-            <span>${user.solved} solved</span>
-            <span>${user.streaks.current} day streak</span>
-            <span>${user.contestRating ? Math.round(user.contestRating) : "—"} contest rating</span>
+            <span><b>${user.solved}</b> solved</span>
+            <span><b>${user.streaks.current}</b> day streak</span>
+            <span><b>${user.contestRating ? Math.round(user.contestRating) : "—"}</b> contest rating</span>
           </div>`).join("")}</div>
+      </div>
       </div>`;
   } catch (error) {
     results.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="err-msg">${escapeHTML(error.message)}</div></div>`;
