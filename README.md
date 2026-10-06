@@ -104,6 +104,11 @@ For Render, use `npm start` from the repository root or deploy the Dockerfile.
 Configure `PORT`, `DB_PATH`, and optional provider keys through Render
 environment variables. SQLite on the free tier is ephemeral.
 
+For durable production snapshots, set `DATABASE_URL` to a Neon or Supabase
+PostgreSQL connection string. When `DATABASE_URL` is present, the app uses the
+PostgreSQL adapter automatically; otherwise local development continues to use
+SQLite. `DATABASE_SSL=true` is the default for hosted PostgreSQL.
+
 ### Custom domain
 
 In Render, open **Settings → Custom Domains**, add your domain, and follow the

@@ -2,6 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 
+if (process.env.DATABASE_URL || process.env.DB_DRIVER === "postgres") {
+  module.exports = require("./postgres-database");
+  return;
+}
+
 const databasePath = process.env.DB_PATH || path.join(__dirname, "data", "leetmatric.sqlite");
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 const db = new sqlite3.Database(databasePath);
@@ -110,7 +115,8 @@ async function getGroupMembers(groupCode) {
   return all("SELECT username FROM group_members WHERE group_code = ? ORDER BY username", [groupCode.toLowerCase()]);
 }
 
-function closeDatabase() {
+async function closeDatabase() {
+  await engagementReady;
   return new Promise((resolve, reject) => {
     db.close((error) => error ? reject(error) : resolve());
   });
