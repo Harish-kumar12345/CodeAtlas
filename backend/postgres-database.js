@@ -282,6 +282,23 @@ async function unlinkAccount(userId, platform, username) {
   );
 }
 
+async function setAccountVisibility(userId, platform, username, isPublic) {
+  await ready;
+  return pool.query(
+    "UPDATE linked_accounts SET is_public = $1, updated_at = NOW() WHERE user_id = $2 AND platform = $3 AND normalized_username = $4",
+    [Boolean(isPublic), userId, platform, username.toLowerCase()],
+  );
+}
+
+async function getPublicAccount(platform, username) {
+  await ready;
+  const result = await pool.query(
+    "SELECT user_id AS \"userId\", platform, username FROM linked_accounts WHERE platform = $1 AND normalized_username = $2 AND is_public = TRUE",
+    [platform, username.toLowerCase()],
+  );
+  return result.rows[0] || null;
+}
+
 async function upsertUser(user) {
   await ready;
   const result = await pool.query(`
@@ -315,4 +332,4 @@ async function closeDatabase() {
   await pool.end();
 }
 
-module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, unlinkAccount, upsertUser };
+module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getPublicAccount, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, setAccountVisibility, unlinkAccount, upsertUser };

@@ -930,3 +930,11 @@ userInput.addEventListener("input", () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => { searchHint.textContent = ""; }, 300);
 });
+
+const publicProfileMatch = window.location.pathname.match(/^\/u\/([a-zA-Z0-9_-]{1,25})$/);
+if (publicProfileMatch) {
+  const publicUsername = publicProfileMatch[1];
+  userInput.value = publicUsername;
+  document.title = `${publicUsername} — CodeAtlas public profile`;
+  handleSearch();
+}

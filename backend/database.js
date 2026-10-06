@@ -25,6 +25,17 @@ async function unlinkAccount(userId, platform, username) {
   return run("DELETE FROM linked_accounts WHERE user_id = ? AND platform = ? AND normalized_username = ?", [userId, platform, username.toLowerCase()]);
 }
 
+async function setAccountVisibility(userId, platform, username, isPublic) {
+  await userGroupReady;
+  return run("UPDATE linked_accounts SET is_public = ?, updated_at = datetime('now') WHERE user_id = ? AND platform = ? AND normalized_username = ?", [isPublic ? 1 : 0, userId, platform, username.toLowerCase()]);
+}
+
+async function getPublicAccount(platform, username) {
+  await userGroupReady;
+  const rows = await all("SELECT user_id AS userId, platform, username FROM linked_accounts WHERE platform = ? AND normalized_username = ? AND is_public = 1", [platform, username.toLowerCase()]);
+  return rows[0] || null;
+}
+
 const databasePath = process.env.DB_PATH || path.join(__dirname, "data", "leetmatric.sqlite");
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 const db = new sqlite3.Database(databasePath);
@@ -233,4 +244,4 @@ async function closeDatabase() {
   });
 }
 
-module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, unlinkAccount, upsertUser };
+module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getPublicAccount, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, setAccountVisibility, unlinkAccount, upsertUser };

@@ -161,9 +161,18 @@ them only as Render environment variables.
 
 Recommendations use a curated interview-practice catalog, normalize common
 topic-name variants, prefer the least-solved difficulty, and remove problems
-present in the user's recent **accepted** submissions. Because LeetCode's
-public recent-submission feed is limited, this is a best-effort unsolved
-filter rather than a complete history guarantee.
+present in the user's recent **accepted** submissions. Because LeetCode's public recent-submission feed is limited, so this is a best-effort
+unsolved filter rather than a complete history guarantee.
+
+Public sharing uses `/u/:username` and `/api/public/:platform/:username`.
+Linked accounts default to public for sharing, but signed-in users can change
+visibility with `PATCH /api/accounts/:platform/:username` and
+`{"isPublic":false}`. Private or unlinked profiles return `PROFILE_PRIVATE`.
+The service also exposes `/robots.txt` and `/sitemap.xml`.
+
+The shareable SVG endpoint remains available at
+`/card/<username>.svg?theme=dark|light`; usernames are XML-escaped before
+rendering.
 
 ### Multi-platform and PDF export
 

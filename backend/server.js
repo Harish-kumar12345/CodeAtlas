@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -11,6 +12,7 @@ const {
   getGoal,
   getGroupMembers,
   getLinkedAccounts,
+  getPublicAccount,
   getProgressHistory,
   getUserById,
   getUserGoal,
@@ -21,6 +23,7 @@ const {
   saveUserGoal,
   linkAccount,
   unlinkAccount,
+  setAccountVisibility,
   upsertUser,
 } = require("./database");
 const { clearCookie, createToken, getCookie, readToken, setCookie } = require("./auth");
@@ -192,6 +195,32 @@ app.delete("/api/accounts/:platform/:username", requireUser, async (req, res) =>
   }
   await unlinkAccount(req.user.id, platform, username);
   return res.status(204).send();
+});
+
+app.patch("/api/accounts/:platform/:username", requireUser, async (req, res) => {
+  const platform = String(req.params.platform || "").toLowerCase();
+  const username = String(req.params.username || "");
+  if (!["leetcode", "codeforces", "codechef", "github"].includes(platform) || !/^[a-zA-Z0-9_-]{1,25}$/.test(username) || typeof req.body?.isPublic !== "boolean") {
+    return sendError(res, 400, "INVALID_ACCOUNT", "Invalid account or visibility value.", false);
+  }
+  await setAccountVisibility(req.user.id, platform, username, req.body.isPublic);
+  return res.json({ accounts: await getLinkedAccounts(req.user.id) });
+});
+
+app.get("/api/public/:platform/:username", async (req, res) => {
+  const platform = String(req.params.platform || "").toLowerCase();
+  const username = String(req.params.username || "");
+  if (!["leetcode", "codeforces", "codechef", "github"].includes(platform) || !/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
+    return sendError(res, 400, "INVALID_PROFILE", "Invalid public profile.", false);
+  }
+  const account = await getPublicAccount(platform, username);
+  if (!account) return sendError(res, 404, "PROFILE_PRIVATE", "This profile is private or has not been linked.", false);
+  try {
+    const profile = platform === "leetcode" ? await loadProfile(username) : await ({ codeforces: getCodeforces, codechef: getCodeChef, github: getGitHub }[platform])(username);
+    return res.json({ username, platform, profile });
+  } catch (error) {
+    return sendProfileError(res, error);
+  }
 });
 
 // ── GraphQL Queries ──────────────────────────────────────────────────────────
@@ -382,6 +411,19 @@ function sendProfileError(res, error) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.send("🚀 Leetlytics Backend is Running");
+});
+
+app.get("/u/:username", (req, res) => {
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(req.params.username)) return sendError(res, 400, "INVALID_PROFILE", "Invalid public profile.", false);
+  return res.sendFile(path.join(__dirname, "../frontend/public/index.html"));
+});
+
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain").send("User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://leetlytics.onrender.com/sitemap.xml\n");
+});
+
+app.get("/sitemap.xml", (_req, res) => {
+  res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://leetlytics.onrender.com/</loc></url></urlset>');
 });
 // GET /api/user/:username  → stats + profile
 app.get("/api/user/:username", async (req, res) => {

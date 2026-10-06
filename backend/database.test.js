@@ -5,7 +5,7 @@ const path = require("path");
 
 const tempPath = path.join(os.tmpdir(), `leetmatric-test-${Date.now()}.sqlite`);
 process.env.DB_PATH = tempPath;
-const { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserGoal, hasUserGroupMember, saveGoal, saveSnapshot, saveUserGoal, upsertUser } = require("./database");
+const { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getProgressHistory, getPublicAccount, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, setAccountVisibility, upsertUser } = require("./database");
 
 (async () => {
   const profile = {
@@ -29,6 +29,11 @@ const { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, 
   assert.equal((await getUserGoal(user.id)).dailyTarget, 4);
   await addUserGroupMember("friends", "tester", user.id);
   assert.equal(await hasUserGroupMember("friends", user.id), true);
+  await linkAccount(user.id, "github", "database-test");
+  assert.equal((await getPublicAccount("github", "database-test")).userId, user.id);
+  await setAccountVisibility(user.id, "github", "database-test", false);
+  assert.equal(await getPublicAccount("github", "database-test"), null);
+  assert.equal(Boolean((await getLinkedAccounts(user.id))[0].isPublic), false);
   await deleteUser(user.id);
   assert.equal(await getUserGoal(user.id), null);
   assert.equal(await hasUserGroupMember("friends", user.id), false);
