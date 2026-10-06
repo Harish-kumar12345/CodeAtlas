@@ -40,7 +40,11 @@ function buildHeatmap(calendar, days = 182) {
   return Array.from({ length: days }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
-    const timestamp = Math.floor(date.getTime() / 1000);
+    const timestamp = Math.floor(Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    ) / 1000);
     const count = Number(entries[timestamp] || entries[String(timestamp)] || 0);
     return {
       date: date.toISOString().slice(0, 10),

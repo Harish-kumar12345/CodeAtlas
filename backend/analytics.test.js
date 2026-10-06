@@ -10,7 +10,11 @@ const {
 
 const now = new Date();
 now.setHours(0, 0, 0, 0);
-const day = (offset) => Math.floor((now.getTime() + offset * 86400000) / 1000);
+const day = (offset) => Math.floor(Date.UTC(
+  now.getFullYear(),
+  now.getMonth(),
+  now.getDate() + offset,
+) / 1000);
 const calendar = JSON.stringify({ [day(-2)]: 2, [day(-1)]: 4, [day(0)]: 1, [day(-4)]: 10 });
 
 assert.equal(buildHeatmap(calendar, 5).filter((entry) => entry.count > 0).length, 4);

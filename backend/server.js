@@ -99,9 +99,9 @@ const RECENT_QUERY = `
 `;
 
 const CALENDAR_QUERY = `
-  query userProfileCalendar($username: String!, $year: Int) {
+  query userProfileCalendar($username: String!) {
     matchedUser(username: $username) {
-      userCalendar(year: $year) {
+      userCalendar {
         streak
         totalActiveDays
         submissionCalendar
@@ -172,10 +172,7 @@ async function loadProfile(username) {
   }
   const user = data.data.matchedUser;
   const topics = getTopicStats(username, user.tagProblemCounts);
-  const calendarData = await leetcodeQuery(CALENDAR_QUERY, {
-    username,
-    year: new Date().getFullYear(),
-  });
+  const calendarData = await leetcodeQuery(CALENDAR_QUERY, { username });
   const calendar = calendarData?.data?.matchedUser?.userCalendar;
   const contestData = await leetcodeQuery(CONTEST_QUERY, { username });
   const calendarJson = calendar?.submissionCalendar || "{}";
@@ -406,12 +403,11 @@ app.get("/api/user/:username/calendar", async (req, res) => {
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
     return res.status(400).json({ error: "Invalid username" });
   }
-  const year = new Date().getFullYear();
-  const cacheKey = `calendar:${username.toLowerCase()}:${year}`;
+  const cacheKey = `calendar:${username.toLowerCase()}`;
   const cached = cachedResponse(endpointCache, cacheKey);
   if (cached) return res.json(cached);
   try {
-    const data = await leetcodeQuery(CALENDAR_QUERY, { username, year });
+    const data = await leetcodeQuery(CALENDAR_QUERY, { username });
     const cal = data?.data?.matchedUser?.userCalendar;
     if (!cal) return res.status(404).json({
       error: "Profile data is private or unavailable",

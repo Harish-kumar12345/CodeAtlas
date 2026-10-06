@@ -179,7 +179,11 @@ function buildHeatmap(calendarStr) {
   let col  = [];
   const cur = new Date(startDate);
   while (cur <= today) {
-    const ts  = Math.floor(cur.getTime() / 1000);
+    const ts  = Math.floor(Date.UTC(
+      cur.getFullYear(),
+      cur.getMonth(),
+      cur.getDate(),
+    ) / 1000);
     const cnt = calData[ts] || 0;
     const lvl = cnt === 0 ? 0 : cnt < 3 ? 1 : cnt < 6 ? 2 : cnt < 10 ? 3 : 4;
     const dateStr = cur.toISOString().slice(0,10);
