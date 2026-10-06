@@ -137,6 +137,22 @@ document.querySelectorAll(".example-link").forEach(example => {
     userInput.focus();
     handleSearch();
   });
+
+  document.addEventListener("click", event => {
+    const link = event.target.closest("[data-dashboard-target]");
+    if (!link) return;
+    const target = document.getElementById(link.dataset.dashboardTarget);
+    if (target) {
+      event.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+      return;
+    }
+    event.preventDefault();
+    userInput.focus();
+    searchHint.textContent = "Search a LeetCode profile first to open this live section.";
+  });
 });
 
 function validate(username) {
