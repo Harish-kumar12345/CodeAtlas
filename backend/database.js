@@ -65,6 +65,16 @@ const authReady = engagementReady.then(() => run(`
     updated_at TEXT NOT NULL,
     UNIQUE (provider, provider_subject)
   )`));
+const userGoalReady = authReady.then(() => run(`
+  CREATE TABLE IF NOT EXISTS user_goals (
+    user_id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL,
+    daily_target INTEGER NOT NULL,
+    reminders_enabled INTEGER NOT NULL DEFAULT 0,
+    reminder_channel TEXT,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`));
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -117,6 +127,20 @@ async function getGoal(username) {
   return rows[0] || null;
 }
 
+async function saveUserGoal(userId, username, goal) {
+  await userGoalReady;
+  return run(`
+    INSERT OR REPLACE INTO user_goals (user_id, username, daily_target, reminders_enabled, reminder_channel, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+  `, [userId, username.toLowerCase(), goal.dailyTarget, goal.remindersEnabled ? 1 : 0, goal.reminderChannel || null]);
+}
+
+async function getUserGoal(userId) {
+  await userGoalReady;
+  const rows = await all("SELECT username, daily_target AS dailyTarget, reminders_enabled AS remindersEnabled, reminder_channel AS reminderChannel, updated_at AS updatedAt FROM user_goals WHERE user_id = ?", [userId]);
+  return rows[0] || null;
+}
+
 async function addGroupMember(groupCode, username) {
   await engagementReady;
   return run("INSERT OR IGNORE INTO group_members (group_code, username) VALUES (?, ?)", [groupCode.toLowerCase(), username.toLowerCase()]);
@@ -149,6 +173,7 @@ async function getUserById(id) {
 
 async function deleteUser(id) {
   await authReady;
+  await run("DELETE FROM user_goals WHERE user_id = ?", [id]);
   await run("DELETE FROM users WHERE id = ?", [id]);
 }
 
@@ -159,4 +184,4 @@ async function closeDatabase() {
   });
 }
 
-module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, saveGoal, saveSnapshot, upsertUser };
+module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, saveGoal, saveSnapshot, saveUserGoal, upsertUser };

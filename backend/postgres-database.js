@@ -78,6 +78,14 @@ const ready = pool.query(`
     reminder_channel TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+  CREATE TABLE IF NOT EXISTS user_goals (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    daily_target INTEGER NOT NULL,
+    reminders_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    reminder_channel TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
   CREATE TABLE IF NOT EXISTS group_members (
     group_code TEXT NOT NULL,
     username TEXT NOT NULL,
@@ -182,6 +190,31 @@ async function getGoal(username) {
   return result.rows[0] || null;
 }
 
+async function saveUserGoal(userId, username, goal) {
+  await ready;
+  return pool.query(`
+    INSERT INTO user_goals (user_id, username, daily_target, reminders_enabled, reminder_channel, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW())
+    ON CONFLICT (user_id) DO UPDATE SET
+      username = EXCLUDED.username,
+      daily_target = EXCLUDED.daily_target,
+      reminders_enabled = EXCLUDED.reminders_enabled,
+      reminder_channel = EXCLUDED.reminder_channel,
+      updated_at = NOW()
+  `, [userId, username.toLowerCase(), goal.dailyTarget, Boolean(goal.remindersEnabled), goal.reminderChannel || null]);
+}
+
+async function getUserGoal(userId) {
+  await ready;
+  const result = await pool.query(`
+    SELECT username, daily_target AS "dailyTarget",
+      reminders_enabled AS "remindersEnabled",
+      reminder_channel AS "reminderChannel", updated_at AS "updatedAt"
+    FROM user_goals WHERE user_id = $1
+  `, [userId]);
+  return result.rows[0] || null;
+}
+
 async function addGroupMember(groupCode, username) {
   await ready;
   return pool.query(
@@ -232,4 +265,4 @@ async function closeDatabase() {
   await pool.end();
 }
 
-module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, saveGoal, saveSnapshot, upsertUser };
+module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, saveGoal, saveSnapshot, saveUserGoal, upsertUser };

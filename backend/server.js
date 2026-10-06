@@ -11,9 +11,11 @@ const {
   getGroupMembers,
   getProgressHistory,
   getUserById,
+  getUserGoal,
   deleteUser,
   saveGoal,
   saveSnapshot,
+  saveUserGoal,
   upsertUser,
 } = require("./database");
 const { clearCookie, createToken, getCookie, readToken, setCookie } = require("./auth");
@@ -92,10 +94,12 @@ function currentUser(req) {
   return readToken(getCookie(req, "codeatlas_session"));
 }
 
-function requireUser(req, res, next) {
+async function requireUser(req, res, next) {
   const session = currentUser(req);
   if (!session) return sendError(res, 401, "AUTH_REQUIRED", "Please sign in to continue.", false);
-  req.user = session;
+  const user = await getUserById(session.userId);
+  if (!user) return sendError(res, 401, "SESSION_INVALID", "Your session has expired. Please sign in again.", false);
+  req.user = user;
   return next();
 }
 
@@ -442,7 +446,7 @@ app.get("/api/user/:username/report.pdf", async (req, res) => {
   }
 });
 
-app.post("/api/user/:username/study-plan", async (req, res) => {
+app.post("/api/user/:username/study-plan", requireUser, async (req, res) => {
   const { username } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
   try {
@@ -456,24 +460,24 @@ app.post("/api/user/:username/study-plan", async (req, res) => {
   }
 });
 
-app.get("/api/user/:username/goal", async (req, res) => {
+app.get("/api/user/:username/goal", requireUser, async (req, res) => {
   const { username } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
-  res.json({ goal: await getGoal(username) });
+  res.json({ goal: await getUserGoal(req.user.id) });
 });
 
-app.put("/api/user/:username/goal", async (req, res) => {
+app.put("/api/user/:username/goal", requireUser, async (req, res) => {
   const { username } = req.params;
   const dailyTarget = Number(req.body?.dailyTarget);
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username) || !Number.isInteger(dailyTarget) || dailyTarget < 1 || dailyTarget > 100) {
     return res.status(400).json({ error: "Daily target must be an integer from 1 to 100" });
   }
-  await saveGoal(username, {
+  await saveUserGoal(req.user.id, username, {
     dailyTarget,
     remindersEnabled: Boolean(req.body.remindersEnabled),
     reminderChannel: req.body.reminderChannel === "telegram" || req.body.reminderChannel === "email" ? req.body.reminderChannel : null,
   });
-  res.json({ goal: await getGoal(username) });
+  res.json({ goal: await getUserGoal(req.user.id) });
 });
 
 app.post("/api/groups/:code/members", async (req, res) => {

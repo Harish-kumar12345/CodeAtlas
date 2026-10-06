@@ -88,7 +88,10 @@ are configured: `SESSION_SECRET`, `GITHUB_CLIENT_ID`,
 be registered in the GitHub OAuth application. Sessions use signed,
 HttpOnly cookies; no passwords are stored. Use `/auth/github` to start login,
 `/auth/logout` to sign out, and `DELETE /api/me` to delete the signed-in
-account and its owned data.
+account and its owned data. Goal reads/writes and AI study-plan generation
+require an authenticated session; public profile search remains available
+without login. Goals are stored by authenticated user ID rather than trusting
+the username in the URL.
 
 ## Testing and deployment
 
