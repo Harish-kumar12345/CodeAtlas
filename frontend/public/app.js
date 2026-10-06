@@ -126,7 +126,44 @@ function animateRing(id, solved, total) {
 
 // ── Build heatmap from LeetCode's submissionCalendar JSON ────────────────────
 function buildHeatmap(calendarStr) {
-  const calData = JSON.parse(calendarStr || "{}");
+  if (Array.isArray(calendarStr)) {
+    const cols = [];
+    let col = [];
+    calendarStr.forEach((day) => {
+      const cell = {
+        lvl: Number(day.level) || 0,
+        cnt: Number(day.count) || 0,
+        dateStr: day.date
+      };
+      col.push(cell);
+      if (col.length === 7) {
+        cols.push(col);
+        col = [];
+      }
+    });
+    if (col.length) cols.push(col);
+    return `
+      <div class="heatmap">
+        ${cols.map(week => `
+          <div class="heatmap-col">
+            ${week.map(d => `
+              <div class="heatmap-cell lvl-${d.lvl}" title="${d.cnt} submission${d.cnt !== 1 ? "s" : ""} on ${d.dateStr}"></div>
+            `).join("")}
+          </div>
+        `).join("")}
+      </div>`;
+  }
+
+  let calData = {};
+  if (calendarStr && typeof calendarStr === "object") {
+    calData = calendarStr;
+  } else {
+    try {
+      calData = JSON.parse(calendarStr || "{}");
+    } catch {
+      calData = {};
+    }
+  }
   const today   = new Date();
   today.setHours(0,0,0,0);
   const weeks = 26; // ~6 months
@@ -189,8 +226,13 @@ function render(userData, calData, recentData, username, progress = [], recommen
     : `<div class="profile-avatar-placeholder">👤</div>`;
 
   // Heatmap
-  const heatmapHTML = calData?.submissionCalendar
-    ? buildHeatmap(calData.submissionCalendar)
+  const heatmapSource = analytics.heatmap?.length
+    ? analytics.heatmap
+    : calData?.heatmap?.length
+      ? calData.heatmap
+      : calData?.submissionCalendar;
+  const heatmapHTML = heatmapSource
+    ? buildHeatmap(heatmapSource)
     : `<div class="empty-state" style="padding:1rem">No calendar data.</div>`;
 
   // Recent submissions
