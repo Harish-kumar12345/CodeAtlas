@@ -291,6 +291,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
     : `<div class="empty-state" style="padding:1rem">No recent submissions.</div>`;
 
   results.innerHTML = `
+    <div class="dashboard-shell">
     <!-- Profile -->
     <div class="profile-card">
       ${avatarHTML}
@@ -301,7 +302,21 @@ function render(userData, calData, recentData, username, progress = [], recommen
           <span>Global Rank</span>
           <span class="rank-badge">#${profile.ranking?.toLocaleString() || "—"}</span>
         </div>
+        <div class="platform-badges" aria-label="Connected platforms">
+          <span class="platform-badge leetcode"><i></i>LeetCode</span>
+          <span class="platform-badge muted-platform"><i></i>Codeforces</span>
+          <span class="platform-badge muted-platform"><i></i>GitHub</span>
+        </div>
       </div>
+      <div class="profile-actions">
+        <a class="dashboard-action secondary" href="/api/user/${encodeURIComponent(username)}/report.pdf">Download PDF</a>
+        <button class="dashboard-action primary" type="button" onclick="document.getElementById('compare-input')?.focus()">Compare</button>
+      </div>
+    </div>
+
+    <div class="dashboard-intro">
+      <div><span class="section-kicker">Profile overview</span><h2>Progress at a glance</h2></div>
+      <span class="ui-badge">LeetCode profile</span>
     </div>
 
     <!-- Solved Rings -->
@@ -449,6 +464,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
     <div class="recent-section">
       <div class="section-title">// recent submissions</div>
       <div class="recent-list">${recentHTML}</div>
+    </div>
     </div>
   `;
 
