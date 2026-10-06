@@ -93,6 +93,44 @@ function updatePreview(userData, calData, username) {
   if (cells) previewHeatmapCells.innerHTML = cells;
 }
 
+function updatePlatformPreview(platform, profile) {
+  const metrics = {
+    Codeforces: [
+      ["Rating", profile.rating ?? "—", "Current rating"],
+      ["Solved", profile.solved ?? "—", "Accepted problems"],
+      ["Submissions", profile.submissions ?? "—", "Recent submissions"],
+      ["Rank", profile.rank || "—", "Competitive rank"],
+    ],
+    CodeChef: [
+      ["Rating", profile.rating ?? "—", "Current rating"],
+      ["Solved", profile.solved ?? "—", "Problems solved"],
+      ["Global rank", profile.globalRank ?? "—", "Overall rank"],
+      ["Stars", profile.stars || "—", "CodeChef stars"],
+    ],
+    GitHub: [
+      ["Repositories", profile.repositories ?? "—", "Public repositories"],
+      ["Followers", profile.followers ?? "—", "People following"],
+      ["Following", profile.following ?? "—", "Accounts following"],
+      ["Gists", profile.publicGists ?? "—", "Public gists"],
+    ],
+  }[profile.provider] || [];
+  const labelIds = ["preview-label-1", "preview-label-2", "preview-label-3", "preview-label-4"];
+  const valueIds = ["preview-solved", "preview-streak", "preview-active-days", "preview-rating"];
+  const noteIds = ["preview-solved-note", "preview-streak-note", "preview-active-note", "preview-rating-note"];
+  metrics.forEach(([label, value, note], index) => {
+    document.getElementById(labelIds[index]).textContent = label;
+    document.getElementById(valueIds[index]).textContent = value;
+    document.getElementById(noteIds[index]).textContent = note;
+  });
+  document.getElementById("preview-badge").innerHTML = `<span class="live-dot"></span> Live ${escapeHTML(profile.provider)} profile`;
+  document.getElementById("preview-avatar").textContent = profile.username.charAt(0).toUpperCase();
+  document.getElementById("preview-username").textContent = profile.username;
+  document.getElementById("preview-subtitle").textContent = `@${profile.username} · ${profile.provider}`;
+  document.getElementById("preview-score").textContent = metrics[0]?.[1] ?? "—";
+  previewHeatmapCells.innerHTML = "";
+  previewHeatmapCells.parentElement.querySelector(".preview-heatmap-title").textContent = `${profile.provider} profile metrics`;
+}
+
 document.querySelectorAll(".example-link").forEach(example => {
   example.addEventListener("click", () => {
     userInput.value = example.dataset.example;
@@ -216,6 +254,7 @@ async function fetchPlatformProfile(username, platform) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || data.error || "Unable to load this profile.");
     renderPlatformProfile(platform, data.profile);
+    updatePlatformPreview(platform, data.profile);
   } catch (error) {
     results.innerHTML = `
       <div class="empty-state">
