@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const fetch = require("node-fetch");
 const rateLimit = require("express-rate-limit");
+const { TtlCache } = require("./cache");
 const {
   buildHeatmap,
   calcStreaks,
@@ -13,6 +14,8 @@ const {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const profileCache = new TtlCache();
+const endpointCache = new TtlCache();
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
@@ -23,7 +26,12 @@ app.use(express.static("../frontend/public"));
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  message: { error: "Too many requests, slow down." },
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({
+    error: "Rate limit exceeded",
+    message: "Too many requests. Please wait a minute and try again.",
+  }),
 });
 app.use("/api/", limiter);
 
@@ -92,19 +100,52 @@ const CALENDAR_QUERY = `
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 async function leetcodeQuery(query, variables) {
-  const res = await fetch(LEETCODE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Referer": "https://leetcode.com",
-      "User-Agent": "Mozilla/5.0",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!res.ok) throw new Error(`LeetCode returned ${res.status}`);
+  let res;
+  try {
+    res = await fetch(LEETCODE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Referer": "https://leetcode.com",
+        "User-Agent": "Mozilla/5.0",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+  } catch (error) {
+    error.code = "LEETCODE_UNAVAILABLE";
+    throw error;
+  }
+  if (!res.ok) {
+    const error = new Error(`LeetCode returned ${res.status}`);
+    error.code = res.status === 429 ? "LEETCODE_RATE_LIMITED" : "LEETCODE_UNAVAILABLE";
+    throw error;
+  }
   const payload = await res.json();
-  if (payload.errors?.length) throw new Error(payload.errors[0].message || "LeetCode query failed");
+  if (payload.errors?.length) {
+    const error = new Error(payload.errors[0].message || "LeetCode query failed");
+    error.code = "LEETCODE_UNAVAILABLE";
+    throw error;
+  }
   return payload;
+}
+
+function cachedResponse(cache, key) {
+  const value = cache.get(key);
+  return value === undefined ? null : value;
+}
+
+function sendUpstreamError(res, error) {
+  console.error(error);
+  if (error.code === "LEETCODE_RATE_LIMITED") {
+    return res.status(503).json({
+      error: "LeetCode is rate limiting requests",
+      message: "LeetCode is temporarily limiting requests. Please try again shortly.",
+    });
+  }
+  return res.status(502).json({
+    error: "LeetCode is unavailable",
+    message: "LeetCode could not be reached. Please try again shortly.",
+  });
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -117,6 +158,9 @@ app.get("/api/user/:username", async (req, res) => {
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
     return res.status(400).json({ error: "Invalid username" });
   }
+  const cacheKey = username.toLowerCase();
+  const cached = cachedResponse(profileCache, cacheKey);
+  if (cached) return res.json(cached);
   try {
     const data = await leetcodeQuery(STATS_QUERY, { username });
     if (!data?.data?.matchedUser) {
@@ -131,7 +175,7 @@ app.get("/api/user/:username", async (req, res) => {
     const calendar = calendarData?.data?.matchedUser?.userCalendar;
     const contestData = await leetcodeQuery(CONTEST_QUERY, { username });
     const calendarJson = calendar?.submissionCalendar || "{}";
-    res.json({
+    const response = {
       ...data.data,
       analytics: {
         difficulty: difficultySummary(
@@ -147,10 +191,11 @@ app.get("/api/user/:username", async (req, res) => {
         contests: contestSummary(contestData?.data?.userContestRankingHistory),
         contestRanking: contestData?.data?.userContestRanking || null,
       },
-    });
+    };
+    profileCache.set(cacheKey, response);
+    res.json(response);
   } catch (err) {
-    console.error(err);
-    res.status(502).json({ error: "Failed to reach LeetCode" });
+    sendUpstreamError(res, err);
   }
 });
 
@@ -160,12 +205,16 @@ app.get("/api/user/:username/recent", async (req, res) => {
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
     return res.status(400).json({ error: "Invalid username" });
   }
+  const cacheKey = `recent:${username.toLowerCase()}`;
+  const cached = cachedResponse(endpointCache, cacheKey);
+  if (cached) return res.json(cached);
   try {
     const data = await leetcodeQuery(RECENT_QUERY, { username });
-    res.json(data.data?.recentSubmissionList || []);
+    const response = data.data?.recentSubmissionList || [];
+    endpointCache.set(cacheKey, response);
+    res.json(response);
   } catch (err) {
-    console.error(err);
-    res.status(502).json({ error: "Failed to reach LeetCode" });
+    sendUpstreamError(res, err);
   }
 });
 
@@ -176,14 +225,21 @@ app.get("/api/user/:username/calendar", async (req, res) => {
     return res.status(400).json({ error: "Invalid username" });
   }
   const year = new Date().getFullYear();
+  const cacheKey = `calendar:${username.toLowerCase()}:${year}`;
+  const cached = cachedResponse(endpointCache, cacheKey);
+  if (cached) return res.json(cached);
   try {
     const data = await leetcodeQuery(CALENDAR_QUERY, { username, year });
     const cal = data?.data?.matchedUser?.userCalendar;
-    if (!cal) return res.status(404).json({ error: "Calendar not found" });
-    res.json({ ...cal, heatmap: buildHeatmap(cal.submissionCalendar), streaks: calcStreaks(cal.submissionCalendar) });
+    if (!cal) return res.status(404).json({
+      error: "Profile data is private or unavailable",
+      message: "This profile does not expose calendar data.",
+    });
+    const response = { ...cal, heatmap: buildHeatmap(cal.submissionCalendar), streaks: calcStreaks(cal.submissionCalendar) };
+    endpointCache.set(cacheKey, response);
+    res.json(response);
   } catch (err) {
-    console.error(err);
-    res.status(502).json({ error: "Failed to reach LeetCode" });
+    sendUpstreamError(res, err);
   }
 });
 

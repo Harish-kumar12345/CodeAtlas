@@ -262,12 +262,12 @@ function render(userData, calData, recentData, username) {
             <div class="streak-num">${analytics.streaks?.longest ?? "—"}</div>
             <div class="streak-lbl">Longest Streak</div>
           </div>
-          <div class="streak-pill">
-            <div class="streak-icon">📅</div>
-            <div class="streak-info">
+        </div>
+        <div class="streak-pill">
+          <div class="streak-icon">📅</div>
+          <div class="streak-info">
             <div class="streak-num">${analytics.streaks?.totalActiveDays ?? calData?.totalActiveDays ?? "—"}</div>
             <div class="streak-lbl">Active Days</div>
-            </div>
           </div>
         </div>
       </div>
@@ -346,7 +346,7 @@ async function fetchAll(username) {
     if (userRes.status === "rejected" || !userRes.value.ok) {
       const msg = userRes.status === "rejected"
         ? "The server is waking up or unreachable. Please try again in a few seconds."
-        : await userRes.value.json().then(d => d.error).catch(() => "Unable to load this profile.");
+        : await userRes.value.json().then(d => d.message || d.error).catch(() => "Unable to load this profile.");
       throw new Error(msg);
     }
 
@@ -362,7 +362,7 @@ async function fetchAll(username) {
       <div class="empty-state">
         <div class="icon">⚠️</div>
         <div class="err-msg">${err.message}</div>
-        <div>Check the username and try again.</div>
+        <div>${err.message.includes("private") ? "Try a public LeetCode profile." : "Check the username and try again."}</div>
       </div>`;
   }
 }
