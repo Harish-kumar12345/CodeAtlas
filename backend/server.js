@@ -394,12 +394,34 @@ app.get("/api/groups/:code/leaderboard", async (req, res) => {
 
 app.get("/api/compare/:first/:second", async (req, res) => {
   const { first, second } = req.params;
+  const platform = String(req.query.platform || "leetcode").toLowerCase();
   if (![first, second].every((username) => /^[a-zA-Z0-9_-]{1,25}$/.test(username))) {
     return res.status(400).json({ error: "Invalid username" });
   }
+  if (!["leetcode", "codeforces", "codechef", "github"].includes(platform)) {
+    return res.status(400).json({ error: "Unsupported platform" });
+  }
   try {
+    if (platform !== "leetcode") {
+      const loaders = { codeforces: getCodeforces, codechef: getCodeChef, github: getGitHub };
+      const profiles = await Promise.all([loaders[platform](first), loaders[platform](second)]);
+      const unavailable = profiles.find((profile) => !profile.available);
+      if (unavailable) {
+        const error = new Error(unavailable.error || `${platform} profile is unavailable`);
+        error.code = "PLATFORM_PROFILE_UNAVAILABLE";
+        throw error;
+      }
+      return res.json({
+        platform,
+        users: profiles.map((profile) => ({
+          ...profile,
+          username: profile.username,
+        })),
+      });
+    }
     const profiles = await Promise.all([loadProfile(first), loadProfile(second)]);
     res.json({
+      platform,
       users: profiles.map((profile, index) => ({
         username: [first, second][index],
         solved: profile.analytics.difficulty.reduce((sum, item) => sum + item.solved, 0),
@@ -410,6 +432,9 @@ app.get("/api/compare/:first/:second", async (req, res) => {
       })),
     });
   } catch (error) {
+    if (error.code === "PLATFORM_PROFILE_UNAVAILABLE") {
+      return res.status(404).json({ error: "Profile unavailable", message: error.message });
+    }
     sendProfileError(res, error);
   }
 });

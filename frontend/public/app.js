@@ -809,7 +809,7 @@ compareBtn.addEventListener("click", async () => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const response = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(first)}/${encodeURIComponent(second)}`, {
+    const response = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(first)}/${encodeURIComponent(second)}?platform=${encodeURIComponent(selectedPlatform)}`, {
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
@@ -819,17 +819,33 @@ compareBtn.addEventListener("click", async () => {
     }
     const [firstUser, secondUser] = data.users;
     const winner = (a, b, key) => Number(a[key] || 0) >= Number(b[key] || 0) ? "winner" : "";
+    const metricRows = user => {
+      if (data.platform === "leetcode") {
+        return `<span><b>${user.solved}</b> solved</span>
+          <span><b>${user.streaks.current}</b> day streak</span>
+          <span><b>${user.contestRating ? Math.round(user.contestRating) : "—"}</b> contest rating</span>`;
+      }
+      const metrics = {
+        codeforces: [["rating", "rating"], ["solved", "solved"], ["submissions", "submissions"]],
+        codechef: [["rating", "rating"], ["solved", "solved"], ["globalRank", "global rank"]],
+        github: [["repositories", "repositories"], ["followers", "followers"], ["publicGists", "public gists"]],
+      }[data.platform] || [];
+      return metrics.map(([key, label]) => `<span><b>${user[key] ?? "—"}</b> ${label}</span>`).join("");
+    };
+    const leadingKey = data.platform === "leetcode"
+      ? "solved"
+      : data.platform === "github"
+        ? "repositories"
+        : "rating";
     results.innerHTML = `
       <div class="comparison-workspace">
-        <div class="dashboard-intro"><div><span class="section-kicker">Compare</span><h2>Head-to-head progress</h2></div><span class="ui-badge">Live comparison</span></div>
+        <div class="dashboard-intro"><div><span class="section-kicker">Compare</span><h2>Head-to-head ${escapeHTML(data.platform)}</h2></div><span class="ui-badge">Live comparison</span></div>
       <div class="analytics-section">
         <div class="section-title">// head-to-head</div>
         <div class="comparison-grid">${data.users.map(user => `
-          <div class="comparison-user ${user === firstUser ? winner(firstUser, secondUser, "solved") : winner(secondUser, firstUser, "solved")}">
+          <div class="comparison-user ${user === firstUser ? winner(firstUser, secondUser, leadingKey) : winner(secondUser, firstUser, leadingKey)}">
             <strong>@${escapeHTML(user.username)}</strong>
-            <span><b>${user.solved}</b> solved</span>
-            <span><b>${user.streaks.current}</b> day streak</span>
-            <span><b>${user.contestRating ? Math.round(user.contestRating) : "—"}</b> contest rating</span>
+            ${metricRows(user)}
           </div>`).join("")}</div>
       </div>
       </div>`;
