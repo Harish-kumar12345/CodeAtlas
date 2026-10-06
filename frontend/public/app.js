@@ -143,13 +143,22 @@ function renderPlatformProfile(platform, profile) {
       ["Rating", profile.rating || "Unrated"],
       ["Best rating", profile.maxRating || "—"],
       ["Rank", profile.rank || "—"],
+      ["Solved", profile.solved ?? "—"],
+      ["Submissions", profile.submissions ?? "—"],
+      ["Contribution", profile.contribution ?? "—"],
     ],
     CodeChef: [
       ["Rating", profile.rating || "Unrated"],
+      ["Highest rating", profile.highestRating || "—"],
+      ["Global rank", profile.globalRank || "—"],
+      ["Problems solved", profile.solved ?? "—"],
+      ["Stars", profile.stars || "—"],
     ],
     GitHub: [
       ["Repositories", profile.repositories ?? 0],
       ["Followers", profile.followers ?? 0],
+      ["Following", profile.following ?? 0],
+      ["Public gists", profile.publicGists ?? 0],
     ],
   };
   const stats = labels[profile.provider] || [];

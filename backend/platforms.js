@@ -35,8 +35,17 @@ async function getText(url, headers = {}) {
 
 async function getCodeforces(username) {
   try {
-    const data = await getJson(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(username)}`);
-    const user = data.result?.[0];
+    const [infoData, statusData] = await Promise.all([
+      getJson(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(username)}`),
+      getJson(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(username)}&from=1&count=10000`),
+    ]);
+    const user = infoData.result?.[0];
+    const submissions = statusData.result || [];
+    const solvedProblems = new Set(
+      submissions
+        .filter(item => item.verdict === "OK" && item.problem?.contestId && item.problem?.index)
+        .map(item => `${item.problem.contestId}-${item.problem.index}`),
+    );
     return {
       provider: "Codeforces",
       username,
@@ -44,7 +53,10 @@ async function getCodeforces(username) {
       rating: user?.rating || null,
       maxRating: user?.maxRating || null,
       rank: user?.rank || null,
-      solved: null,
+      solved: solvedProblems.size,
+      submissions: submissions.length,
+      contribution: user?.contribution || 0,
+      friends: user?.friendOfCount || 0,
     };
   } catch (error) {
     return { provider: "Codeforces", username, available: false, error: "Profile unavailable" };
@@ -55,13 +67,20 @@ async function getCodeChef(username) {
   try {
     const data = await getText(`https://www.codechef.com/users/${encodeURIComponent(username)}`);
     const rating = data.match(/class=["']rating-number["'][^>]*>\s*([\d,]+)/i)?.[1]?.replace(/,/g, "") || null;
+    const highestRating = data.match(/Highest Rating\s*([\d,]+)/i)?.[1]?.replace(/,/g, "") || null;
+    const globalRank = data.match(/class=['"]global-rank['"]>\s*([\d,]+)/i)?.[1] || null;
+    const solved = data.match(/Total Problems Solved:\s*([\d,]+)/i)?.[1] || null;
+    const stars = (data.match(/class=["']rating-star["'][\s\S]*?<\/div>/i)?.[0].match(/&#9733;|★/g) || []).length;
     const hasPublicProfile = /"currentUser"\s*:\s*"[^"]+"/i.test(data);
     return {
       provider: "CodeChef",
       username,
       available: Boolean(rating) || hasPublicProfile,
       rating: rating ? Number(rating) : null,
-      solved: null,
+      highestRating: highestRating ? Number(highestRating) : null,
+      globalRank: globalRank ? Number(globalRank) : null,
+      solved: solved ? Number(solved) : null,
+      stars,
       ...((rating || hasPublicProfile) ? {} : { error: "Profile unavailable or provider format changed" }),
     };
   } catch (error) {
@@ -81,6 +100,9 @@ async function getGitHub(username) {
       available: true,
       repositories: user.public_repos,
       followers: user.followers,
+      following: user.following,
+      publicGists: user.public_gists,
+      profileUrl: user.html_url,
       contributions: null,
     };
   } catch (error) {
