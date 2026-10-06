@@ -10,6 +10,16 @@ async function getJson(url, headers = {}) {
   return response.json();
 }
 
+async function getText(url, headers = {}) {
+  const response = await fetch(url, { headers: { Accept: "text/html", ...headers } });
+  if (!response.ok) {
+    const error = new Error(`Provider returned ${response.status}`);
+    error.code = response.status === 404 ? "NOT_FOUND" : "UNAVAILABLE";
+    throw error;
+  }
+  return response.text();
+}
+
 async function getCodeforces(username) {
   try {
     const data = await getJson(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(username)}`);
@@ -30,7 +40,7 @@ async function getCodeforces(username) {
 
 async function getCodeChef(username) {
   try {
-    const data = await getJson(`https://www.codechef.com/users/${encodeURIComponent(username)}`, { Accept: "text/html" });
+    const data = await getText(`https://www.codechef.com/users/${encodeURIComponent(username)}`);
     const rating = data.match(/rating-number[^>]*>([^<]+)/i)?.[1]?.trim() || null;
     return {
       provider: "CodeChef",

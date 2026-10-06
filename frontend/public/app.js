@@ -17,6 +17,7 @@ const compareBtn = document.getElementById("compare-btn");
 const themeToggle = document.getElementById("theme-toggle");
 const platformSelector = document.getElementById("platform-selector");
 const previewHeatmapCells = document.getElementById("preview-heatmap-cells");
+let selectedPlatform = "leetcode";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 46; // SVG ring circumference (r=46)
@@ -46,8 +47,15 @@ platformSelector?.addEventListener("click", event => {
 
   const platform = option.dataset.platform;
   userInput.setAttribute("aria-label", `${option.textContent.trim()} username`);
-  userInput.placeholder = platform === "github" ? "e.g. torvalds" : platform === "codeforces" ? "e.g. tourist" : "e.g. neal_wu";
-  searchHint.textContent = platform === "leetcode" ? "" : `${option.textContent.trim()} connections are coming soon — LeetCode search remains active.`;
+  selectedPlatform = platform;
+  userInput.placeholder = platform === "github"
+    ? "e.g. torvalds"
+    : platform === "codeforces"
+      ? "e.g. tourist"
+      : platform === "codechef"
+        ? "e.g. admin"
+        : "e.g. neal_wu";
+  searchHint.textContent = "";
 });
 
 if (previewHeatmapCells) {
@@ -127,6 +135,59 @@ function showSkeleton() {
       </div>
     </div>
   `;
+}
+
+function renderPlatformProfile(platform, profile) {
+  const labels = {
+    Codeforces: [
+      ["Rating", profile.rating || "Unrated"],
+      ["Best rating", profile.maxRating || "—"],
+      ["Rank", profile.rank || "—"],
+    ],
+    CodeChef: [
+      ["Rating", profile.rating || "Unrated"],
+    ],
+    GitHub: [
+      ["Repositories", profile.repositories ?? 0],
+      ["Followers", profile.followers ?? 0],
+    ],
+  };
+  const stats = labels[profile.provider] || [];
+  results.innerHTML = `
+    <section class="analytics-section platform-profile-card" aria-labelledby="platform-profile-title">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">${escapeHTML(profile.provider)} profile</span>
+          <h2 id="platform-profile-title">@${escapeHTML(profile.username)}</h2>
+        </div>
+        <span class="platform-badge ${platform}"><i></i>${escapeHTML(profile.provider)}</span>
+      </div>
+      <div class="stats-grid">
+        ${stats.map(([label, value]) => `
+          <div class="stat-tile">
+            <span class="stat-label">${escapeHTML(label)}</span>
+            <strong class="stat-value">${escapeHTML(value)}</strong>
+          </div>`).join("")}
+      </div>
+      <p class="muted platform-profile-note">Public profile data loaded successfully.</p>
+    </section>`;
+}
+
+async function fetchPlatformProfile(username, platform) {
+  showSkeleton();
+  try {
+    const response = await fetch(`${API_BASE}/api/platform/${encodeURIComponent(platform)}/${encodeURIComponent(username)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || data.error || "Unable to load this profile.");
+    renderPlatformProfile(platform, data.profile);
+  } catch (error) {
+    results.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">⚠️</div>
+        <div class="err-msg">${escapeHTML(error.message)}</div>
+        <div>Check the public username and try again.</div>
+      </div>`;
+  }
 }
 
 // ── SVG Ring helper ───────────────────────────────────────────────────────────
@@ -623,7 +684,11 @@ async function handleSearch() {
   if (err) { searchHint.textContent = err; return; }
   searchHint.textContent = "";
   setLoading(true);
-  await fetchAll(username);
+  if (selectedPlatform === "leetcode") {
+    await fetchAll(username);
+  } else {
+    await fetchPlatformProfile(username, selectedPlatform);
+  }
   setLoading(false);
 }
 

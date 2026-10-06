@@ -13,7 +13,13 @@ const {
 } = require("./database");
 const { renderStatsCard } = require("./cards");
 const { createStudyPlan, recommendProblems } = require("./engagement");
-const { combinedScore, getPlatformProfiles } = require("./platforms");
+const {
+  combinedScore,
+  getCodeChef,
+  getCodeforces,
+  getGitHub,
+  getPlatformProfiles,
+} = require("./platforms");
 const { buildPdfReport } = require("./report");
 const {
   buildHeatmap,
@@ -259,6 +265,39 @@ app.get("/api/user/:username/platforms", async (req, res) => {
     res.json({ username, platforms, combinedScore: combinedScore(profile, platforms) });
   } catch (error) {
     sendProfileError(res, error);
+  }
+});
+
+app.get("/api/platform/:platform/:username", async (req, res) => {
+  const platform = req.params.platform.toLowerCase();
+  const username = req.params.username.trim();
+  const providers = {
+    codeforces: getCodeforces,
+    codechef: getCodeChef,
+    github: getGitHub,
+  };
+  const provider = providers[platform];
+  if (!provider) {
+    return res.status(400).json({
+      error: "Unsupported platform",
+      message: "Choose Codeforces, CodeChef, or GitHub.",
+    });
+  }
+  try {
+    const profile = await provider(username);
+    if (!profile.available) {
+      return res.status(404).json({
+        error: "Profile unavailable",
+        message: profile.error || `No public ${platform} profile was found.`,
+      });
+    }
+    return res.json({ platform, profile });
+  } catch (error) {
+    console.error(error);
+    return res.status(502).json({
+      error: "Platform unavailable",
+      message: `Unable to reach ${platform} right now. Please try again shortly.`,
+    });
   }
 });
 
