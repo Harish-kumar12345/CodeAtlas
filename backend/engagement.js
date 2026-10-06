@@ -13,6 +13,20 @@ const PROBLEMS = [
   ["Trapping Rain Water", "trapping-rain-water", "Two Pointers", "Hard"],
   ["Word Ladder", "word-ladder", "Graph", "Hard"],
   ["Edit Distance", "edit-distance", "Dynamic Programming", "Hard"],
+  ["Contains Duplicate", "contains-duplicate", "Array", "Easy"],
+  ["Valid Anagram", "valid-anagram", "String", "Easy"],
+  ["Reverse Linked List", "reverse-linked-list", "Linked List", "Easy"],
+  ["Maximum Subarray", "maximum-subarray", "Array", "Medium"],
+  ["Group Anagrams", "group-anagrams", "String", "Medium"],
+  ["Top K Frequent Elements", "top-k-frequent-elements", "Hash Table", "Medium"],
+  ["Longest Palindromic Substring", "longest-palindromic-substring", "Dynamic Programming", "Medium"],
+  ["Rotate Image", "rotate-image", "Array", "Medium"],
+  ["Kth Smallest Element in a BST", "kth-smallest-element-in-a-bst", "Tree", "Medium"],
+  ["Implement Trie", "implement-trie-prefix-tree", "Trie", "Medium"],
+  ["Merge k Sorted Lists", "merge-k-sorted-lists", "Linked List", "Hard"],
+  ["Serialize and Deserialize Binary Tree", "serialize-and-deserialize-binary-tree", "Tree", "Hard"],
+  ["Minimum Window Substring", "minimum-window-substring", "Sliding Window", "Hard"],
+  ["Network Delay Time", "network-delay-time", "Graph", "Medium"],
 ];
 
 const COMPANY_GUIDANCE = {
@@ -33,15 +47,23 @@ function companyPrep(topics = [], company = "Google") {
   return { company: COMPANY_GUIDANCE[company] ? company : "Google", approximate: true, coverage, percentage: Math.round((coverage.filter((item) => item.covered).length / target.length) * 100) };
 }
 
+function normalizeTopic(topic) {
+  return String(topic || "").toLowerCase().replace(/dynamic programming/g, "dp").replace(/ies\b/g, "y").replace(/s\b/g, "").replace(/[^a-z0-9]/g, "");
+}
+
 function recommendProblems(weakTopics = [], difficulty = [], recent = []) {
-  const weak = weakTopics.map((topic) => topic.toLowerCase());
-  const accepted = new Set(recent.map((item) => item.titleSlug));
+  const weak = weakTopics.map(normalizeTopic).filter(Boolean);
+  const accepted = new Set(recent
+    .filter((item) => String(item.statusDisplay || "").toLowerCase() === "accepted")
+    .flatMap((item) => [item.titleSlug, item.title])
+    .filter(Boolean)
+    .map((item) => String(item).toLowerCase()));
   const preferredDifficulty = difficulty.slice().sort((a, b) => a.solved - b.solved)[0]?.difficulty;
   return PROBLEMS
-    .filter((problem) => !accepted.has(problem[1]))
+    .filter((problem) => !accepted.has(problem[1].toLowerCase()) && !accepted.has(problem[0].toLowerCase()))
     .map((problem) => ({
       title: problem[0], slug: problem[1], topic: problem[2], difficulty: problem[3],
-      score: (weak.some((topic) => problem[2].toLowerCase().includes(topic) || topic.includes(problem[2].toLowerCase())) ? 2 : 0) + (problem[3] === preferredDifficulty ? 1 : 0),
+      score: (weak.some((topic) => normalizeTopic(problem[2]).includes(topic) || topic.includes(normalizeTopic(problem[2]))) ? 2 : 0) + (problem[3] === preferredDifficulty ? 1 : 0),
       url: `https://leetcode.com/problems/${problem[1]}/`,
     }))
     .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))

@@ -159,6 +159,12 @@ limited to three generations per user per day. The optional provider configurati
 `AI_MODEL` (defaults to `gpt-4o-mini`). Never commit these values; configure
 them only as Render environment variables.
 
+Recommendations use a curated interview-practice catalog, normalize common
+topic-name variants, prefer the least-solved difficulty, and remove problems
+present in the user's recent **accepted** submissions. Because LeetCode's
+public recent-submission feed is limited, this is a best-effort unsolved
+filter rather than a complete history guarantee.
+
 ### Multi-platform and PDF export
 
 `GET /api/user/<username>/platforms` queries public Codeforces, CodeChef, and
