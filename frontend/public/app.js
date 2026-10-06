@@ -310,7 +310,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
       </div>
       <div class="profile-actions">
         <a class="dashboard-action secondary" href="/api/user/${encodeURIComponent(username)}/report.pdf">Download PDF</a>
-        <button class="dashboard-action primary" type="button" onclick="document.getElementById('compare-input')?.focus()">Compare</button>
+        <button class="dashboard-action primary" id="profile-compare-btn" type="button">Compare</button>
       </div>
     </div>
 
@@ -548,6 +548,9 @@ async function fetchAll(username) {
       } finally {
         event.currentTarget.disabled = false;
       }
+    });
+    document.getElementById("profile-compare-btn")?.addEventListener("click", () => {
+      compareInput?.focus();
     });
     const goalOutput = document.getElementById("goal-output");
     fetch(`${API_BASE}/api/user/${encodeURIComponent(username)}/goal`)
