@@ -138,7 +138,7 @@ document.querySelectorAll(".example-link").forEach(example => {
     handleSearch();
   });
 
-  document.addEventListener("click", event => {
+  document.addEventListener("click", async event => {
     const link = event.target.closest("[data-dashboard-target]");
     if (!link) return;
     const target = document.getElementById(link.dataset.dashboardTarget);
@@ -149,9 +149,18 @@ document.querySelectorAll(".example-link").forEach(example => {
       target.focus({ preventScroll: true });
       return;
     }
+    const username = userInput.value.trim();
+    const validationError = validate(username);
+    if (!validationError) {
+      event.preventDefault();
+      await handleSearch();
+      results.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     event.preventDefault();
     userInput.focus();
-    searchHint.textContent = "Search a LeetCode profile first to open this live section.";
+    const platformName = platformSelector?.querySelector(".platform-option.active")?.textContent.trim() || "selected platform";
+    searchHint.textContent = `Search a ${platformName} profile first to open this live section.`;
   });
 });
 
