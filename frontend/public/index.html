@@ -32,6 +32,11 @@
         </div>
         <span class="logo-text">CodeAtlas</span>
       </div>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="#features">Features</a>
+        <a href="#preview">Preview</a>
+        <a href="#results">Dashboard</a>
+      </nav>
       <div class="header-actions">
         <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch to light theme" aria-pressed="false">☼ Light</button>
         <a href="https://leetcode.com" target="_blank" rel="noopener" class="header-link">leetcode.com ↗</a>
@@ -40,11 +45,16 @@
 
     <!-- ── HERO SEARCH ── -->
     <section class="hero">
-      <div class="hero-tag">// progress tracker</div>
+        <div class="hero-tag">CODING PROFILE OS <span>•</span> IN BETA</div>
       <h1 class="hero-title">One profile for<br/><em>all your coding journeys</em></h1>
       <p class="hero-sub">Track your progress across the platforms where you build, compete, and grow.</p>
 
       <div class="search-card">
+        <div class="platform-selector" id="platform-selector" role="group" aria-label="Choose a platform">
+          <button type="button" class="platform-option active" data-platform="leetcode" aria-pressed="true"><span class="platform-dot leetcode"></span>LeetCode</button>
+          <button type="button" class="platform-option" data-platform="codeforces" aria-pressed="false"><span class="platform-dot codeforces"></span>Codeforces</button>
+          <button type="button" class="platform-option" data-platform="github" aria-pressed="false"><span class="platform-dot github"></span>GitHub</button>
+        </div>
         <div class="search-inner">
           <div class="search-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -62,15 +72,60 @@
           </button>
         </div>
         <div class="search-hint" id="search-hint"></div>
+        <div class="search-example">Try <button type="button" class="example-link" data-example="lee215">lee215</button> or <button type="button" class="example-link" data-example="neal_wu">neal_wu</button></div>
       </div>
+      <p class="connect-note"><span class="connect-icon">✦</span> Connect multiple platforms for one complete coding profile <span class="soon-badge">Coming soon</span></p>
       <div class="compare-card">
         <input type="text" id="compare-input" placeholder="Compare with another username" maxlength="25" aria-label="Username to compare" />
         <button id="compare-btn" type="button">Compare</button>
       </div>
     </section>
 
+    <section class="preview-section" id="preview" aria-labelledby="preview-title">
+      <div class="section-kicker">A clearer view of your progress</div>
+      <div class="preview-heading">
+        <div>
+          <h2 id="preview-title">Your coding journey,<br/><span>in one place.</span></h2>
+          <p>See momentum, patterns, and opportunities to improve without switching between tabs.</p>
+        </div>
+        <span class="ui-badge"><span class="live-dot"></span> Live profile preview</span>
+      </div>
+      <div class="preview-card">
+        <div class="preview-profile">
+          <div class="preview-avatar">A</div>
+          <div><strong>alex.dev</strong><span>Software engineer · 4 platforms</span></div>
+          <span class="preview-score">8.6 <small>coding score</small></span>
+        </div>
+        <div class="preview-stats">
+          <div><span>Total solved</span><strong>1,248</strong><small>+36 this month</small></div>
+          <div><span>Current streak</span><strong>18 days</strong><small>Personal best</small></div>
+          <div><span>Active days</span><strong>142</strong><small>Last 6 months</small></div>
+          <div><span>Contest rating</span><strong>1,842</strong><small>Top 8%</small></div>
+        </div>
+        <div class="preview-heatmap" aria-label="Sample activity heatmap">
+          <span class="preview-heatmap-title">Activity across platforms</span>
+          <div id="preview-heatmap-cells"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-section" id="features" aria-labelledby="features-title">
+      <div class="section-kicker">Everything that matters</div>
+      <div class="feature-heading"><h2 id="features-title">Built for consistent progress.</h2><p>Less tab-switching. More signal. A calm home for your coding momentum.</p></div>
+      <div class="feature-grid">
+        <article class="feature-card"><span class="feature-icon violet">◈</span><h3>Unified analytics</h3><p>Bring solved problems, ratings, streaks, and activity into one focused view.</p><span class="feature-arrow">Explore insights →</span></article>
+        <article class="feature-card"><span class="feature-icon green">↗</span><h3>Momentum, made visible</h3><p>Understand your habits with heatmaps, progress history, and meaningful trends.</p><span class="feature-arrow">Track your growth →</span></article>
+        <article class="feature-card"><span class="feature-icon amber">✦</span><h3>Smarter next steps</h3><p>Find weak topics and turn them into a practical, personalized practice plan.</p><span class="feature-arrow">Improve with intent →</span></article>
+      </div>
+    </section>
+
     <!-- ── RESULTS ── -->
     <main class="results" id="results" aria-live="polite"></main>
+
+    <footer class="site-footer">
+      <div><strong>CodeAtlas</strong><span>One profile for all your coding journeys.</span></div>
+      <div class="footer-links"><a href="#features">Features</a><a href="#preview">Preview</a><a href="https://leetcode.com" target="_blank" rel="noopener">LeetCode ↗</a></div>
+    </footer>
 
   </div><!-- /page-wrapper -->
 

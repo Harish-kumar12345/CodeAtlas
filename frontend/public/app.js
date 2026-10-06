@@ -15,6 +15,8 @@ const btnSpinner  = searchBtn.querySelector(".btn-spinner");
 const compareInput = document.getElementById("compare-input");
 const compareBtn = document.getElementById("compare-btn");
 const themeToggle = document.getElementById("theme-toggle");
+const platformSelector = document.getElementById("platform-selector");
+const previewHeatmapCells = document.getElementById("preview-heatmap-cells");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 46; // SVG ring circumference (r=46)
@@ -32,6 +34,37 @@ const savedTheme = localStorage.getItem("codeatlas-theme") || localStorage.getIt
 const preferredTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 setTheme(savedTheme || preferredTheme, false);
 themeToggle.addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
+
+platformSelector?.addEventListener("click", event => {
+  const option = event.target.closest(".platform-option");
+  if (!option) return;
+  platformSelector.querySelectorAll(".platform-option").forEach(button => {
+    const active = button === option;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  const platform = option.dataset.platform;
+  userInput.setAttribute("aria-label", `${option.textContent.trim()} username`);
+  userInput.placeholder = platform === "github" ? "e.g. torvalds" : platform === "codeforces" ? "e.g. tourist" : "e.g. neal_wu";
+  searchHint.textContent = platform === "leetcode" ? "" : `${option.textContent.trim()} connections are coming soon — LeetCode search remains active.`;
+});
+
+if (previewHeatmapCells) {
+  const levels = [0, 0, 1, 1, 2, 2, 3, 4];
+  previewHeatmapCells.innerHTML = Array.from(
+    { length: 84 },
+    (_, index) => `<i class="heat-${levels[(index * 7 + 3) % levels.length]}"></i>`,
+  ).join("");
+}
+
+document.querySelectorAll(".example-link").forEach(example => {
+  example.addEventListener("click", () => {
+    userInput.value = example.dataset.example;
+    userInput.focus();
+    handleSearch();
+  });
+});
 
 function validate(username) {
   if (!username.trim()) return "Username cannot be empty.";
