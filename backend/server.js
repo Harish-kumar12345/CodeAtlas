@@ -10,6 +10,7 @@ const {
   addUserGroupMember,
   getGoal,
   getGroupMembers,
+  getLinkedAccounts,
   getProgressHistory,
   getUserById,
   getUserGoal,
@@ -18,6 +19,8 @@ const {
   saveGoal,
   saveSnapshot,
   saveUserGoal,
+  linkAccount,
+  unlinkAccount,
   upsertUser,
 } = require("./database");
 const { clearCookie, createToken, getCookie, readToken, setCookie } = require("./auth");
@@ -160,6 +163,30 @@ app.get("/api/me", async (req, res) => {
 app.delete("/api/me", requireUser, async (req, res) => {
   await deleteUser(req.user.userId);
   clearCookie(res, "codeatlas_session");
+  return res.status(204).send();
+});
+
+app.get("/api/accounts", requireUser, async (req, res) => {
+  return res.json({ accounts: await getLinkedAccounts(req.user.id) });
+});
+
+app.post("/api/accounts", requireUser, async (req, res) => {
+  const platform = String(req.body?.platform || "").toLowerCase();
+  const username = String(req.body?.username || "").trim();
+  if (!["leetcode", "codeforces", "codechef", "github"].includes(platform) || !/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
+    return sendError(res, 400, "INVALID_ACCOUNT", "Choose a supported platform and valid username.", false);
+  }
+  await linkAccount(req.user.id, platform, username);
+  return res.status(201).json({ accounts: await getLinkedAccounts(req.user.id) });
+});
+
+app.delete("/api/accounts/:platform/:username", requireUser, async (req, res) => {
+  const platform = String(req.params.platform || "").toLowerCase();
+  const username = String(req.params.username || "");
+  if (!["leetcode", "codeforces", "codechef", "github"].includes(platform) || !/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
+    return sendError(res, 400, "INVALID_ACCOUNT", "Invalid linked account.", false);
+  }
+  await unlinkAccount(req.user.id, platform, username);
   return res.status(204).send();
 });
 

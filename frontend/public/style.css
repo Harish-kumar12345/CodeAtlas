@@ -186,6 +186,8 @@ a { color: inherit; }
 }
 .header-link:hover { color: var(--accent2); }
 .header-actions { display: flex; align-items: center; gap: .8rem; }
+.auth-user { color: var(--text2); font-size: .72rem; font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-danger { color: var(--danger); }
 .site-nav { display: flex; gap: 1.5rem; margin-left: auto; margin-right: 2rem; }
 .site-nav a { color: var(--text3); text-decoration: none; font-size: .8rem; font-weight: 600; transition: color var(--transition-fast); }
 .site-nav a:hover { color: var(--text); }

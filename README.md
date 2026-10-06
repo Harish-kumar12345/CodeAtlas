@@ -93,7 +93,8 @@ require an authenticated session; public profile search remains available
 without login. Goals are stored by authenticated user ID rather than trusting
 the username in the URL. Group membership and leaderboard access also require
 authentication; a signed-in user must join a group before its leaderboard can
-be read.
+be read. Signed-in users can manage linked public accounts through
+`GET/POST /api/accounts` and `DELETE /api/accounts/:platform/:username`.
 
 ## Testing and deployment
 

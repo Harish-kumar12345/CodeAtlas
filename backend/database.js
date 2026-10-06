@@ -7,6 +7,24 @@ if (process.env.DATABASE_URL || process.env.DB_DRIVER === "postgres") {
   return;
 }
 
+async function linkAccount(userId, platform, username) {
+  await userGroupReady;
+  return run(`
+    INSERT OR REPLACE INTO linked_accounts (user_id, platform, username, normalized_username, is_public, updated_at)
+    VALUES (?, ?, ?, ?, 1, datetime('now'))
+  `, [userId, platform, username, username.toLowerCase()]);
+}
+
+async function getLinkedAccounts(userId) {
+  await userGroupReady;
+  return all("SELECT platform, username, is_public AS isPublic, updated_at AS updatedAt FROM linked_accounts WHERE user_id = ? ORDER BY platform, username", [userId]);
+}
+
+async function unlinkAccount(userId, platform, username) {
+  await userGroupReady;
+  return run("DELETE FROM linked_accounts WHERE user_id = ? AND platform = ? AND normalized_username = ?", [userId, platform, username.toLowerCase()]);
+}
+
 const databasePath = process.env.DB_PATH || path.join(__dirname, "data", "leetmatric.sqlite");
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 const db = new sqlite3.Database(databasePath);
@@ -64,6 +82,16 @@ const authReady = engagementReady.then(() => run(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE (provider, provider_subject)
+  )`)).then(() => run(`
+  CREATE TABLE IF NOT EXISTS linked_accounts (
+    user_id INTEGER NOT NULL,
+    platform TEXT NOT NULL,
+    username TEXT NOT NULL,
+    normalized_username TEXT NOT NULL,
+    is_public INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, platform, normalized_username),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`));
 const userGoalReady = authReady.then(() => run(`
   CREATE TABLE IF NOT EXISTS user_goals (
@@ -192,6 +220,7 @@ async function getUserById(id) {
 
 async function deleteUser(id) {
   await authReady;
+  await run("DELETE FROM linked_accounts WHERE user_id = ?", [id]);
   await run("DELETE FROM user_goals WHERE user_id = ?", [id]);
   await run("DELETE FROM user_group_members WHERE user_id = ?", [id]);
   await run("DELETE FROM users WHERE id = ?", [id]);
@@ -204,4 +233,4 @@ async function closeDatabase() {
   });
 }
 
-module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, saveGoal, saveSnapshot, saveUserGoal, upsertUser };
+module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, unlinkAccount, upsertUser };

@@ -255,6 +255,33 @@ async function hasUserGroupMember(groupCode, userId) {
   return result.rowCount > 0;
 }
 
+async function linkAccount(userId, platform, username) {
+  await ready;
+  return pool.query(`
+    INSERT INTO linked_accounts (user_id, platform, username, normalized_username, is_public, updated_at)
+    VALUES ($1, $2, $3, $4, TRUE, NOW())
+    ON CONFLICT (user_id, platform, normalized_username) DO UPDATE SET
+      username = EXCLUDED.username, updated_at = NOW()
+  `, [userId, platform, username, username.toLowerCase()]);
+}
+
+async function getLinkedAccounts(userId) {
+  await ready;
+  const result = await pool.query(`
+    SELECT platform, username, is_public AS "isPublic", updated_at AS "updatedAt"
+    FROM linked_accounts WHERE user_id = $1 ORDER BY platform, username
+  `, [userId]);
+  return result.rows;
+}
+
+async function unlinkAccount(userId, platform, username) {
+  await ready;
+  return pool.query(
+    "DELETE FROM linked_accounts WHERE user_id = $1 AND platform = $2 AND normalized_username = $3",
+    [userId, platform, username.toLowerCase()],
+  );
+}
+
 async function upsertUser(user) {
   await ready;
   const result = await pool.query(`
@@ -288,4 +315,4 @@ async function closeDatabase() {
   await pool.end();
 }
 
-module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, saveGoal, saveSnapshot, saveUserGoal, upsertUser };
+module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getLinkedAccounts, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, linkAccount, saveGoal, saveSnapshot, saveUserGoal, unlinkAccount, upsertUser };

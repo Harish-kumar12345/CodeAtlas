@@ -17,7 +17,34 @@ const compareBtn = document.getElementById("compare-btn");
 const themeToggle = document.getElementById("theme-toggle");
 const platformSelector = document.getElementById("platform-selector");
 const previewHeatmapCells = document.getElementById("preview-heatmap-cells");
+const authSignIn = document.getElementById("auth-sign-in");
+const authUser = document.getElementById("auth-user");
+const authLogout = document.getElementById("auth-logout");
+const authDelete = document.getElementById("auth-delete");
 let selectedPlatform = "leetcode";
+
+async function loadAuthState() {
+  try {
+    const response = await fetch("/api/me");
+    const data = await response.json();
+    if (!response.ok || !data.user) return;
+    authSignIn.hidden = true;
+    authUser.hidden = false;
+    authUser.textContent = `Signed in as ${data.user.displayName || data.user.email || "GitHub user"}`;
+    authLogout.hidden = false;
+    authDelete.hidden = false;
+  } catch {
+    // Public profile search remains usable if auth status cannot be loaded.
+  }
+}
+
+authLogout?.addEventListener("click", () => { window.location.href = "/auth/logout"; });
+authDelete?.addEventListener("click", async () => {
+  if (!window.confirm("Delete your CodeAtlas account and private data?")) return;
+  const response = await fetch("/api/me", { method: "DELETE" });
+  if (response.ok) window.location.reload();
+});
+loadAuthState();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 46; // SVG ring circumference (r=46)
