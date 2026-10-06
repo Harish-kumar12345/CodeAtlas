@@ -3,8 +3,16 @@ const cors = require("cors");
 const fetch = require("node-fetch");
 const rateLimit = require("express-rate-limit");
 const { TtlCache } = require("./cache");
-const { getProgressHistory, saveSnapshot } = require("./database");
+const {
+  addGroupMember,
+  getGoal,
+  getGroupMembers,
+  getProgressHistory,
+  saveGoal,
+  saveSnapshot,
+} = require("./database");
 const { renderStatsCard } = require("./cards");
+const { createStudyPlan, recommendProblems } = require("./engagement");
 const {
   buildHeatmap,
   calcStreaks,
@@ -229,6 +237,82 @@ app.get("/api/user/:username/progress", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Unable to load progress history" });
+  }
+});
+
+app.get("/api/user/:username/recommendations", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  try {
+    const profile = await loadProfile(username);
+    const recentData = await leetcodeQuery(RECENT_QUERY, { username });
+    res.json({ problems: recommendProblems(profile.analytics.weakTopics, profile.analytics.difficulty, recentData.data?.recentSubmissionList || []) });
+  } catch (error) {
+    sendProfileError(res, error);
+  }
+});
+
+app.post("/api/user/:username/study-plan", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  try {
+    const profile = await loadProfile(username);
+    const recommendations = recommendProblems(profile.analytics.weakTopics, profile.analytics.difficulty);
+    res.json(await createStudyPlan(profile, recommendations));
+  } catch (error) {
+    if (error.code === "AI_NOT_CONFIGURED") return res.status(503).json({ error: "AI study plans are not configured", message: "Set AI_API_KEY on the server to enable study plans." });
+    console.error(error);
+    res.status(503).json({ error: "AI study plan unavailable", message: "The study-plan provider could not be reached." });
+  }
+});
+
+app.get("/api/user/:username/goal", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  res.json({ goal: await getGoal(username) });
+});
+
+app.put("/api/user/:username/goal", async (req, res) => {
+  const { username } = req.params;
+  const dailyTarget = Number(req.body?.dailyTarget);
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username) || !Number.isInteger(dailyTarget) || dailyTarget < 1 || dailyTarget > 100) {
+    return res.status(400).json({ error: "Daily target must be an integer from 1 to 100" });
+  }
+  await saveGoal(username, {
+    dailyTarget,
+    remindersEnabled: Boolean(req.body.remindersEnabled),
+    reminderChannel: req.body.reminderChannel === "telegram" || req.body.reminderChannel === "email" ? req.body.reminderChannel : null,
+  });
+  res.json({ goal: await getGoal(username) });
+});
+
+app.post("/api/groups/:code/members", async (req, res) => {
+  const code = req.params.code;
+  const username = req.body?.username;
+  if (!/^[a-zA-Z0-9_-]{3,32}$/.test(code) || !/^[a-zA-Z0-9_-]{1,25}$/.test(username || "")) {
+    return res.status(400).json({ error: "Invalid group code or username" });
+  }
+  await addGroupMember(code, username);
+  res.status(201).json({ groupCode: code, username });
+});
+
+app.get("/api/groups/:code/leaderboard", async (req, res) => {
+  const code = req.params.code;
+  if (!/^[a-zA-Z0-9_-]{3,32}$/.test(code)) return res.status(400).json({ error: "Invalid group code" });
+  try {
+    const members = await getGroupMembers(code);
+    const leaderboard = await Promise.all(members.map(async ({ username }) => {
+      const profile = await loadProfile(username);
+      return {
+        username,
+        solved: profile.analytics.difficulty.reduce((sum, item) => sum + item.solved, 0),
+        streak: profile.analytics.streaks.current,
+        contestRating: profile.analytics.contestRanking?.rating || null,
+      };
+    }));
+    res.json({ groupCode: code, leaderboard: leaderboard.sort((a, b) => b.solved - a.solved) });
+  } catch (error) {
+    sendProfileError(res, error);
   }
 });
 

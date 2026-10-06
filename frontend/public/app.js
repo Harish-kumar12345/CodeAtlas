@@ -152,7 +152,7 @@ function buildHeatmap(calendarStr) {
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function render(userData, calData, recentData, username, progress = []) {
+function render(userData, calData, recentData, username, progress = [], recommendations = []) {
   const aq = userData.allQuestionsCount;
   const ac = userData.matchedUser.submitStats.acSubmissionNum;
   const ts = userData.matchedUser.submitStats.totalSubmissionNum;
@@ -303,6 +303,15 @@ function render(userData, calData, recentData, username, progress = []) {
               </svg>
             </div>` : `<div class="muted">Daily snapshots will build this chart over time.</div>`}
         </div>
+
+        <div class="analytics-section">
+          <div class="section-title">// recommended practice</div>
+          <div class="recommendation-list">
+            ${recommendations.map(problem => `<a class="recommendation-item" href="${problem.url}" target="_blank" rel="noopener"><strong>${escapeHTML(problem.title)}</strong><span>${escapeHTML(problem.topic)} · ${escapeHTML(problem.difficulty)}</span></a>`).join("") || `<div class="muted">No recommendations available.</div>`}
+          </div>
+          <button class="study-plan-btn" id="study-plan-btn" type="button">Generate 7-day AI study plan</button>
+          <div id="study-plan-output" class="study-plan-output" hidden></div>
+        </div>
         <div class="weak-topics">
           <div class="analytics-label">Focus next</div>
           ${weakTopics.map(topic => `<span class="weak-topic">${escapeHTML(topic)}</span>`).join("") || `<span class="muted">No weak topics found.</span>`}
@@ -353,11 +362,12 @@ function render(userData, calData, recentData, username, progress = []) {
 async function fetchAll(username) {
   showSkeleton();
   try {
-    const [userRes, calRes, recentRes, progressRes] = await Promise.allSettled([
+    const [userRes, calRes, recentRes, progressRes, recommendationsRes] = await Promise.allSettled([
       fetch(`${API_BASE}/api/user/${username}`),
       fetch(`${API_BASE}/api/user/${username}/calendar`),
       fetch(`${API_BASE}/api/user/${username}/recent`),
       fetch(`${API_BASE}/api/user/${username}/progress?days=30`),
+      fetch(`${API_BASE}/api/user/${username}/recommendations`),
     ]);
 
     // Main user data is required
@@ -375,8 +385,26 @@ async function fetchAll(username) {
       ? await recentRes.value.json() : [];
     const progressData = progressRes.status === "fulfilled" && progressRes.value.ok
       ? await progressRes.value.json() : { history: [] };
+    const recommendationsData = recommendationsRes.status === "fulfilled" && recommendationsRes.value.ok
+      ? await recommendationsRes.value.json() : { problems: [] };
 
-    render(userData, calData, recentData, username, progressData.history);
+    render(userData, calData, recentData, username, progressData.history, recommendationsData.problems);
+    document.getElementById("study-plan-btn")?.addEventListener("click", async (event) => {
+      const output = document.getElementById("study-plan-output");
+      event.currentTarget.disabled = true;
+      output.hidden = false;
+      output.textContent = "Generating a plan…";
+      try {
+        const response = await fetch(`${API_BASE}/api/user/${username}/study-plan`, { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || "Unable to generate a plan.");
+        output.textContent = data.plan;
+      } catch (error) {
+        output.textContent = error.message;
+      } finally {
+        event.currentTarget.disabled = false;
+      }
+    });
   } catch (err) {
     results.innerHTML = `
       <div class="empty-state">

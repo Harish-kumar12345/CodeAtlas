@@ -61,6 +61,10 @@ The backend serves the frontend from `frontend/public/` automatically.
 - **Daily snapshots** — SQLite-backed progress history and growth chart
 - **User comparison** — compare solved counts, streaks, and contest ratings
 - **Shareable cards** — `/card/<username>.svg?theme=dark` or `theme=light`
+- **Problem recommendations** — weak-topic and difficulty-aware candidates
+- **Optional AI study plan** — `POST /api/user/:username/study-plan`
+- **Goals** — daily target and optional reminder preference storage
+- **Group leaderboard** — private group-code membership and ranking endpoints
 - **Input validation** — both client & server side
 - **Enter key support** + debounced error clearing
 
@@ -69,6 +73,14 @@ The backend serves the frontend from `frontend/public/` automatically.
 Works on any Node host: **Railway**, **Render**, **Fly.io**, **VPS**.
 
 Set `PORT` environment variable if needed (defaults to `3000`).
+
+### Optional AI study plans
+
+Set `AI_API_KEY` to enable study plans. The optional provider configuration is
+`AI_API_URL` (defaults to the OpenAI-compatible chat completions endpoint) and
+`AI_MODEL` (defaults to `gpt-4o-mini`). Never commit these values; configure
+them only as Render environment variables. Without a key, the endpoint returns
+a friendly disabled response.
 
 ### Snapshot storage on Render
 

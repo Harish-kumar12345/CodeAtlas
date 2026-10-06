@@ -33,6 +33,21 @@ const ready = run(`
     PRIMARY KEY (username, snapshot_date)
   )
 `);
+const engagementReady = ready
+  .then(() => run(`
+  CREATE TABLE IF NOT EXISTS goals (
+    username TEXT PRIMARY KEY,
+    daily_target INTEGER NOT NULL,
+    reminders_enabled INTEGER NOT NULL DEFAULT 0,
+    reminder_channel TEXT,
+    updated_at TEXT NOT NULL
+  )`))
+  .then(() => run(`
+  CREATE TABLE IF NOT EXISTS group_members (
+    group_code TEXT NOT NULL,
+    username TEXT NOT NULL,
+    PRIMARY KEY (group_code, username)
+  )`));
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -71,10 +86,34 @@ async function getProgressHistory(username, days = 30) {
   `, [username.toLowerCase(), `-${boundedDays - 1} days`]);
 }
 
+async function saveGoal(username, goal) {
+  await engagementReady;
+  return run(`
+    INSERT OR REPLACE INTO goals (username, daily_target, reminders_enabled, reminder_channel, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+  `, [username.toLowerCase(), goal.dailyTarget, goal.remindersEnabled ? 1 : 0, goal.reminderChannel || null]);
+}
+
+async function getGoal(username) {
+  await engagementReady;
+  const rows = await all("SELECT username, daily_target AS dailyTarget, reminders_enabled AS remindersEnabled, reminder_channel AS reminderChannel, updated_at AS updatedAt FROM goals WHERE username = ?", [username.toLowerCase()]);
+  return rows[0] || null;
+}
+
+async function addGroupMember(groupCode, username) {
+  await engagementReady;
+  return run("INSERT OR IGNORE INTO group_members (group_code, username) VALUES (?, ?)", [groupCode.toLowerCase(), username.toLowerCase()]);
+}
+
+async function getGroupMembers(groupCode) {
+  await engagementReady;
+  return all("SELECT username FROM group_members WHERE group_code = ? ORDER BY username", [groupCode.toLowerCase()]);
+}
+
 function closeDatabase() {
   return new Promise((resolve, reject) => {
     db.close((error) => error ? reject(error) : resolve());
   });
 }
 
-module.exports = { closeDatabase, getProgressHistory, saveSnapshot };
+module.exports = { addGroupMember, closeDatabase, getGoal, getGroupMembers, getProgressHistory, saveGoal, saveSnapshot };
