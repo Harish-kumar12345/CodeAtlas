@@ -25,7 +25,7 @@ const {
 } = require("./database");
 const { clearCookie, createToken, getCookie, readToken, setCookie } = require("./auth");
 const { renderStatsCard } = require("./cards");
-const { createStudyPlan, recommendProblems } = require("./engagement");
+const { companyPrep, createStudyPlan, recommendProblems } = require("./engagement");
 const {
   combinedScore,
   getCodeChef,
@@ -41,6 +41,7 @@ const {
   difficultySummary,
   findWeakTopics,
   getTopicStats,
+  placementReadiness,
 } = require("./analytics");
 
 const app = express();
@@ -357,6 +358,8 @@ async function loadProfile(username) {
       contestRanking: contestData?.data?.userContestRanking || null,
     },
   };
+  response.analytics.readiness = placementReadiness(response.analytics);
+  response.analytics.companyPrep = companyPrep(topics);
   profileCache.set(cacheKey, response);
   try {
     await saveSnapshot(username, response);
@@ -412,6 +415,17 @@ app.get("/api/user/:username/recommendations", async (req, res) => {
     res.json({ problems: recommendProblems(profile.analytics.weakTopics, profile.analytics.difficulty, recentData.data?.recentSubmissionList || []) });
   } catch (error) {
     sendProfileError(res, error);
+  }
+});
+
+app.get("/api/user/:username/company-prep", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return sendError(res, 400, "INVALID_USERNAME", "Invalid username.", false);
+  try {
+    const profile = await loadProfile(username);
+    return res.json(companyPrep(profile.analytics.topics, String(req.query.company || "Google")));
+  } catch (error) {
+    return sendProfileError(res, error);
   }
 });
 

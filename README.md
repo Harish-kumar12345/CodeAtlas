@@ -96,6 +96,16 @@ authentication; a signed-in user must join a group before its leaderboard can
 be read. Signed-in users can manage linked public accounts through
 `GET/POST /api/accounts` and `DELETE /api/accounts/:platform/:username`.
 
+### Placement readiness
+
+LeetCode profiles include a transparent 0–100 readiness score. It is the sum
+of topic coverage (35 points), medium/hard difficulty mix (30), consistency
+measured by active days (20), and contest rating (15). The score is guidance,
+not a hiring prediction. Company preparation coverage is similarly
+approximate and currently includes Google, Amazon, Microsoft, and Meta topic
+sets. The API accepts a company with
+`GET /api/user/:username/company-prep?company=Google`.
+
 ## Testing and deployment
 
 Run the complete backend test suite:

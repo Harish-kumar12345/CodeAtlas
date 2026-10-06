@@ -455,6 +455,8 @@ function render(userData, calData, recentData, username, progress = [], recommen
   const analytics = userData.analytics || {};
   const topics = analytics.topics || [];
   const weakTopics = analytics.weakTopics || [];
+  const readiness = analytics.readiness || { score: 0, breakdown: {} };
+  const companyPrep = analytics.companyPrep || { company: "Google", percentage: 0, coverage: [] };
   const contestHistory = analytics.contests?.history || [];
   const maxTopicSolved = Math.max(...topics.map(topic => topic.solved), 1);
   const maxRating = Math.max(...contestHistory.map(contest => contest.rating), 1);
@@ -598,6 +600,20 @@ function render(userData, calData, recentData, username, progress = [], recommen
               <div class="topic-track"><span style="width:${(topic.solved / maxTopicSolved) * 100}%"></span></div>
               <span class="topic-count">${topic.solved}</span>
             </div>`).join("") || `<div class="empty-state">No topic data available.</div>`}
+        </div>
+
+        <div class="analytics-section" id="dashboard-readiness">
+          <div class="section-title">// placement readiness</div>
+          <div class="readiness-card">
+            <div class="readiness-score">${readiness.score}<span>/100</span></div>
+            <div class="readiness-copy">
+              <strong>Transparent preparation score</strong>
+              <span>Topics ${readiness.breakdown.topicCoverage || 0}/35 · Difficulty ${readiness.breakdown.difficultyMix || 0}/30 · Consistency ${readiness.breakdown.consistency || 0}/20 · Contest ${readiness.breakdown.contestRating || 0}/15</span>
+            </div>
+          </div>
+          <div class="section-title company-title">// ${escapeHTML(companyPrep.company)} prep guidance</div>
+          <div class="company-prep-note">Approximate guidance, not official hiring data · ${companyPrep.percentage}% topic coverage</div>
+          <div class="company-topic-list">${companyPrep.coverage.map(item => `<span class="${item.covered ? "covered" : "gap"}">${escapeHTML(item.topic)} · ${item.covered ? "covered" : "gap"}</span>`).join("")}</div>
         </div>
 
         <div class="analytics-section" id="dashboard-progress">

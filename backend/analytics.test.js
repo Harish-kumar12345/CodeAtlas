@@ -6,6 +6,7 @@ const {
   difficultySummary,
   findWeakTopics,
   getTopicStats,
+  placementReadiness,
 } = require("./analytics");
 
 const now = new Date();
@@ -42,5 +43,11 @@ assert.deepEqual(contestSummary([
     { title: "Two", rating: 1300, rank: 10, attendedAt: 2, ratingChange: 100 },
   ],
 });
+assert.deepEqual(placementReadiness({
+  difficulty: [{ solved: 10 }, { solved: 10 }, { solved: 5 }],
+  topics: Array.from({ length: 6 }, (_, index) => ({ solved: index + 1 })),
+  streaks: { totalActiveDays: 30 },
+  contestRanking: { rating: 1400 },
+}).breakdown, { topicCoverage: 18, difficultyMix: 28, consistency: 10, contestRating: 8 });
 
 console.log("analytics tests passed");

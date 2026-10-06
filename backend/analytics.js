@@ -116,6 +116,26 @@ function difficultySummary(allQuestionsCount = [], solvedCounts = [], acceptedSu
   });
 }
 
+function placementReadiness({ difficulty = [], topics = [], streaks = {}, contestRanking = null } = {}) {
+  const solved = difficulty.reduce((sum, item) => sum + (Number(item.solved) || 0), 0);
+  const topicCoverage = Math.min(1, topics.filter((topic) => Number(topic.solved) > 0).length / 12);
+  const difficultyMix = solved
+    ? Math.min(1, ((Number(difficulty[1]?.solved) || 0) + (Number(difficulty[2]?.solved) || 0)) / solved / 0.65)
+    : 0;
+  const consistency = Math.min(1, (Number(streaks.totalActiveDays) || 0) / 60);
+  const contest = Math.min(1, Math.max(0, ((Number(contestRanking?.rating) || 0) - 800) / 1200));
+  const score = Math.round((topicCoverage * 35) + (difficultyMix * 30) + (consistency * 20) + (contest * 15));
+  return {
+    score: Math.max(0, Math.min(100, score)),
+    breakdown: {
+      topicCoverage: Math.round(topicCoverage * 35),
+      difficultyMix: Math.round(difficultyMix * 30),
+      consistency: Math.round(consistency * 20),
+      contestRating: Math.round(contest * 15),
+    },
+  };
+}
+
 module.exports = {
   buildHeatmap,
   calcStreaks,
@@ -124,4 +144,5 @@ module.exports = {
   findWeakTopics,
   getTopicStats,
   normalizeContestHistory,
+  placementReadiness,
 };

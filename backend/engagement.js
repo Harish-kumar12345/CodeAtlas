@@ -15,6 +15,24 @@ const PROBLEMS = [
   ["Edit Distance", "edit-distance", "Dynamic Programming", "Hard"],
 ];
 
+const COMPANY_GUIDANCE = {
+  Google: ["Array", "String", "Graph", "Dynamic Programming", "Binary Search"],
+  Amazon: ["Array", "String", "Graph", "Dynamic Programming", "Tree"],
+  Microsoft: ["Array", "String", "Tree", "Graph", "Binary Search"],
+  Meta: ["Array", "String", "Graph", "Dynamic Programming", "Two Pointers"],
+};
+
+function companyPrep(topics = [], company = "Google") {
+  const target = COMPANY_GUIDANCE[company] || COMPANY_GUIDANCE.Google;
+  const solved = new Map(topics.map((topic) => [topic.topic.toLowerCase(), Number(topic.solved) || 0]));
+  const coverage = target.map((topic) => ({
+    topic,
+    solved: solved.get(topic.toLowerCase()) || 0,
+    covered: (solved.get(topic.toLowerCase()) || 0) > 0,
+  }));
+  return { company: COMPANY_GUIDANCE[company] ? company : "Google", approximate: true, coverage, percentage: Math.round((coverage.filter((item) => item.covered).length / target.length) * 100) };
+}
+
 function recommendProblems(weakTopics = [], difficulty = [], recent = []) {
   const weak = weakTopics.map((topic) => topic.toLowerCase());
   const accepted = new Set(recent.map((item) => item.titleSlug));
@@ -60,4 +78,4 @@ async function createStudyPlan(profile, recommendations) {
   return { model, plan: payload.choices?.[0]?.message?.content || "" };
 }
 
-module.exports = { createStudyPlan, recommendProblems };
+module.exports = { companyPrep, createStudyPlan, recommendProblems };
