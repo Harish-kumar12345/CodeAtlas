@@ -150,11 +150,14 @@ not include synthetic images.
 
 ### Optional AI study plans
 
-Set `AI_API_KEY` to enable study plans. The optional provider configuration is
+Set `AI_API_KEY` to enable AI-generated study plans. Without a key, the endpoint
+returns a deterministic rule-based seven-day plan. Provider failures and
+invalid responses also fall back safely. Responses are validated to contain
+exactly seven days, cached for 15 minutes per signed-in user/profile, and
+limited to three generations per user per day. The optional provider configuration is
 `AI_API_URL` (defaults to the OpenAI-compatible chat completions endpoint) and
 `AI_MODEL` (defaults to `gpt-4o-mini`). Never commit these values; configure
-them only as Render environment variables. Without a key, the endpoint returns
-a friendly disabled response.
+them only as Render environment variables.
 
 ### Multi-platform and PDF export
 

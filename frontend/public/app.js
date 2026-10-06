@@ -765,7 +765,7 @@ async function fetchAll(username) {
         const response = await fetch(`${API_BASE}/api/user/${username}/study-plan`, { method: "POST" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || data.error || "Unable to generate a plan.");
-        output.textContent = data.plan;
+        output.textContent = `${data.source === "ai" ? "AI-generated plan" : "Rule-based plan"}\n\n${JSON.stringify(data.plan, null, 2)}`;
       } catch (error) {
         output.textContent = error.message;
       } finally {

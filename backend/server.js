@@ -48,6 +48,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const profileCache = new TtlCache();
 const endpointCache = new TtlCache();
+const studyPlanCache = new TtlCache();
+const studyPlanUsage = new Map();
+const STUDY_PLAN_DAILY_LIMIT = 3;
 const circuit = { failures: 0, openedAt: 0 };
 const CIRCUIT_FAILURE_LIMIT = 3;
 const CIRCUIT_COOLDOWN_MS = 30 * 1000;
@@ -409,6 +412,12 @@ app.get("/api/user/:username/progress", async (req, res) => {
 app.get("/api/user/:username/recommendations", async (req, res) => {
   const { username } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  const usageKey = `${req.user.id}:${new Date().toISOString().slice(0, 10)}`;
+  const cacheKey = `${req.user.id}:${username.toLowerCase()}`;
+  const cachedPlan = studyPlanCache.get(cacheKey);
+  if (cachedPlan) return res.json(cachedPlan);
+  const usage = studyPlanUsage.get(usageKey) || 0;
+  if (usage >= STUDY_PLAN_DAILY_LIMIT) return sendError(res, 429, "STUDY_PLAN_LIMIT", "Daily study-plan limit reached. Try again tomorrow.", false);
   try {
     const profile = await loadProfile(username);
     const recentData = await leetcodeQuery(RECENT_QUERY, { username });
@@ -495,9 +504,11 @@ app.post("/api/user/:username/study-plan", requireUser, async (req, res) => {
   try {
     const profile = await loadProfile(username);
     const recommendations = recommendProblems(profile.analytics.weakTopics, profile.analytics.difficulty);
-    res.json(await createStudyPlan(profile, recommendations));
+    const result = await createStudyPlan(profile, recommendations);
+    studyPlanUsage.set(usageKey, usage + 1);
+    studyPlanCache.set(cacheKey, result, 15 * 60 * 1000);
+    res.json(result);
   } catch (error) {
-    if (error.code === "AI_NOT_CONFIGURED") return res.status(503).json({ error: "AI study plans are not configured", message: "Set AI_API_KEY on the server to enable study plans." });
     console.error(error);
     res.status(503).json({ error: "AI study plan unavailable", message: "The study-plan provider could not be reached." });
   }
