@@ -74,6 +74,20 @@ app.use((req, res, next) => {
   const requestId = req.get("X-Request-ID") || crypto.randomUUID();
   req.requestId = requestId;
   res.set("X-Request-ID", requestId);
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.set("X-Frame-Options", "SAMEORIGIN");
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    console.log(JSON.stringify({
+      event: "request",
+      requestId,
+      method: req.method,
+      path: req.path.startsWith("/api") ? "/api" : req.path,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    }));
+  });
   next();
 });
 
@@ -108,12 +122,17 @@ function currentUser(req) {
 }
 
 async function requireUser(req, res, next) {
-  const session = currentUser(req);
-  if (!session) return sendError(res, 401, "AUTH_REQUIRED", "Please sign in to continue.", false);
-  const user = await getUserById(session.userId);
-  if (!user) return sendError(res, 401, "SESSION_INVALID", "Your session has expired. Please sign in again.", false);
-  req.user = user;
-  return next();
+  try {
+    const session = currentUser(req);
+    if (!session) return sendError(res, 401, "AUTH_REQUIRED", "Please sign in to continue.", false);
+    const user = await getUserById(session.userId);
+    if (!user) return sendError(res, 401, "SESSION_INVALID", "Your session has expired. Please sign in again.", false);
+    req.user = user;
+    return next();
+  } catch (error) {
+    console.error(JSON.stringify({ event: "auth_lookup_failed", requestId: req.requestId, error: error.message }));
+    return sendError(res, 503, "AUTH_UNAVAILABLE", "Sign-in is temporarily unavailable. Please try again.", true);
+  }
 }
 
 app.get("/auth/github", (req, res) => {
@@ -733,6 +752,16 @@ app.get("/api/user/:username/calendar", async (req, res) => {
   } catch (err) {
     sendUpstreamError(res, err);
   }
+});
+
+app.use("/api", (req, res) => {
+  sendError(res, 404, "NOT_FOUND", "The requested API endpoint was not found.", false);
+});
+
+app.use((error, req, res, _next) => {
+  console.error(JSON.stringify({ event: "request_failed", requestId: req.requestId, error: error.message }));
+  if (res.headersSent) return;
+  sendError(res, 500, "INTERNAL_ERROR", "The server could not complete that request.", false);
 });
 
 // ── Start ────────────────────────────────────────────────────────────────────
