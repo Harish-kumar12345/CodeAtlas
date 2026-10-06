@@ -134,6 +134,17 @@ docker build -t leetmatric .
 docker run --rm -p 3000:3000 --env-file .env leetmatric
 ```
 
+For local production parity with PostgreSQL:
+
+```bash
+docker compose up --build
+```
+
+Then verify `http://localhost:3000/health`. Stop the stack with
+`docker compose down`; add `-v` only when you intentionally want to remove
+the local PostgreSQL volume. The image includes the same health check used by
+the Compose service and Render can use `/health` as its service health path.
+
 The app now supports a persistent dark/light theme toggle, keyboard-visible
 focus states, responsive comparison controls, and accessible labels on the
 primary form controls.
