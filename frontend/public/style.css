@@ -194,6 +194,15 @@ body {
   padding: 0.5rem 0.75rem 0.25rem;
   min-height: 1.5rem;
 }
+.compare-card { display: flex; gap: .5rem; max-width: 540px; margin: .75rem auto 0; }
+.compare-card input { flex: 1; min-width: 0; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: .7rem .85rem; font-family: var(--font-mono); font-size: .72rem; }
+.compare-card button { border: 1px solid rgba(124,106,255,.4); border-radius: 9px; background: transparent; color: var(--accent2); padding: .7rem .9rem; cursor: pointer; font-family: var(--font-sans); font-weight: 700; }
+.progress-chart { background: var(--surface2); border-radius: 10px; padding: .75rem; }
+.progress-chart svg { width: 100%; display: block; }
+.progress-chart polyline { fill: none; stroke: var(--easy); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.comparison-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+.comparison-user { display: grid; gap: .45rem; background: var(--surface2); border-radius: 10px; padding: 1rem; color: var(--text2); font-family: var(--font-mono); font-size: .72rem; }
+.comparison-user strong { color: var(--accent2); font-family: var(--font-sans); font-size: 1rem; }
 
 /* ── Results ───────────────────────────────────────────────────────────── */
 .results {
@@ -589,6 +598,7 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 @media (max-width: 560px) {
+  .compare-card, .comparison-grid { grid-template-columns: 1fr; display: grid; }
   .topic-layout { grid-template-columns: 1fr; }
   .weak-topics { border-left: 0; border-top: 1px solid var(--border); padding: 1rem 0 0; }
   .contest-summary { grid-template-columns: repeat(2, 1fr); }

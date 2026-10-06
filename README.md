@@ -58,6 +58,9 @@ The backend serves the frontend from `frontend/public/` automatically.
 - **Recent submissions** — last 8 attempts with status, language, time
 - **Skeleton loaders** — smooth loading states
 - **Rate limiting** — 30 req/min per IP to protect the proxy
+- **Daily snapshots** — SQLite-backed progress history and growth chart
+- **User comparison** — compare solved counts, streaks, and contest ratings
+- **Shareable cards** — `/card/<username>.svg?theme=dark` or `theme=light`
 - **Input validation** — both client & server side
 - **Enter key support** + debounced error clearing
 
@@ -66,3 +69,10 @@ The backend serves the frontend from `frontend/public/` automatically.
 Works on any Node host: **Railway**, **Render**, **Fly.io**, **VPS**.
 
 Set `PORT` environment variable if needed (defaults to `3000`).
+
+### Snapshot storage on Render
+
+Snapshots use SQLite by default at `backend/data/leetmatric.sqlite`. Render's free-tier
+filesystem is ephemeral, so local snapshots can be lost during redeploys or service
+restarts. Set `DB_PATH` to a persistent mounted path where available, or migrate the
+repository module in `backend/database.js` to PostgreSQL for durable production history.

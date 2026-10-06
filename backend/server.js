@@ -3,6 +3,8 @@ const cors = require("cors");
 const fetch = require("node-fetch");
 const rateLimit = require("express-rate-limit");
 const { TtlCache } = require("./cache");
+const { getProgressHistory, saveSnapshot } = require("./database");
+const { renderStatsCard } = require("./cards");
 const {
   buildHeatmap,
   calcStreaks,
@@ -148,6 +150,58 @@ function sendUpstreamError(res, error) {
   });
 }
 
+async function loadProfile(username) {
+  const cacheKey = username.toLowerCase();
+  const cached = cachedResponse(profileCache, cacheKey);
+  if (cached) return cached;
+  const data = await leetcodeQuery(STATS_QUERY, { username });
+  if (!data?.data?.matchedUser) {
+    const error = new Error("User not found");
+    error.code = "USER_NOT_FOUND";
+    throw error;
+  }
+  const user = data.data.matchedUser;
+  const topics = getTopicStats(username, user.tagProblemCounts);
+  const calendarData = await leetcodeQuery(CALENDAR_QUERY, {
+    username,
+    year: new Date().getFullYear(),
+  });
+  const calendar = calendarData?.data?.matchedUser?.userCalendar;
+  const contestData = await leetcodeQuery(CONTEST_QUERY, { username });
+  const calendarJson = calendar?.submissionCalendar || "{}";
+  const response = {
+    ...data.data,
+    analytics: {
+      difficulty: difficultySummary(
+        data.data.allQuestionsCount,
+        user.submitStats.acSubmissionNum,
+        user.submitStats.acSubmissionNum,
+        user.submitStats.totalSubmissionNum,
+      ),
+      topics,
+      weakTopics: findWeakTopics(topics),
+      heatmap: buildHeatmap(calendarJson),
+      streaks: calcStreaks(calendarJson),
+      contests: contestSummary(contestData?.data?.userContestRankingHistory),
+      contestRanking: contestData?.data?.userContestRanking || null,
+    },
+  };
+  profileCache.set(cacheKey, response);
+  try {
+    await saveSnapshot(username, response);
+  } catch (error) {
+    console.error("Snapshot save failed:", error);
+  }
+  return response;
+}
+
+function sendProfileError(res, error) {
+  if (error.code === "USER_NOT_FOUND") {
+    return res.status(404).json({ error: "User not found", message: "No public LeetCode profile was found for this username." });
+  }
+  return sendUpstreamError(res, error);
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.send("🚀 Leetlytics Backend is Running");
@@ -158,44 +212,59 @@ app.get("/api/user/:username", async (req, res) => {
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
     return res.status(400).json({ error: "Invalid username" });
   }
-  const cacheKey = username.toLowerCase();
-  const cached = cachedResponse(profileCache, cacheKey);
-  if (cached) return res.json(cached);
   try {
-    const data = await leetcodeQuery(STATS_QUERY, { username });
-    if (!data?.data?.matchedUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    const user = data.data.matchedUser;
-    const topics = getTopicStats(username, user.tagProblemCounts);
-    const calendarData = await leetcodeQuery(CALENDAR_QUERY, {
-      username,
-      year: new Date().getFullYear(),
-    });
-    const calendar = calendarData?.data?.matchedUser?.userCalendar;
-    const contestData = await leetcodeQuery(CONTEST_QUERY, { username });
-    const calendarJson = calendar?.submissionCalendar || "{}";
-    const response = {
-      ...data.data,
-      analytics: {
-        difficulty: difficultySummary(
-          data.data.allQuestionsCount,
-          user.submitStats.acSubmissionNum,
-          user.submitStats.acSubmissionNum,
-          user.submitStats.totalSubmissionNum,
-        ),
-        topics,
-        weakTopics: findWeakTopics(topics),
-        heatmap: buildHeatmap(calendarJson),
-        streaks: calcStreaks(calendarJson),
-        contests: contestSummary(contestData?.data?.userContestRankingHistory),
-        contestRanking: contestData?.data?.userContestRanking || null,
-      },
-    };
-    profileCache.set(cacheKey, response);
-    res.json(response);
+    res.json(await loadProfile(username));
   } catch (err) {
-    sendUpstreamError(res, err);
+    sendProfileError(res, err);
+  }
+});
+
+app.get("/api/user/:username/progress", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
+    return res.status(400).json({ error: "Invalid username" });
+  }
+  try {
+    res.json({ username, history: await getProgressHistory(username, req.query.days) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Unable to load progress history" });
+  }
+});
+
+app.get("/api/compare/:first/:second", async (req, res) => {
+  const { first, second } = req.params;
+  if (![first, second].every((username) => /^[a-zA-Z0-9_-]{1,25}$/.test(username))) {
+    return res.status(400).json({ error: "Invalid username" });
+  }
+  try {
+    const profiles = await Promise.all([loadProfile(first), loadProfile(second)]);
+    res.json({
+      users: profiles.map((profile, index) => ({
+        username: [first, second][index],
+        solved: profile.analytics.difficulty.reduce((sum, item) => sum + item.solved, 0),
+        difficulty: profile.analytics.difficulty,
+        streaks: profile.analytics.streaks,
+        contestRating: profile.analytics.contestRanking?.rating || null,
+        topics: profile.analytics.topics,
+      })),
+    });
+  } catch (error) {
+    sendProfileError(res, error);
+  }
+});
+
+app.get("/card/:username.svg", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) {
+    return res.status(400).type("text/plain").send("Invalid username");
+  }
+  try {
+    const profile = await loadProfile(username);
+    const theme = req.query.theme === "light" ? "light" : "dark";
+    res.type("image/svg+xml").set("Cache-Control", "public, max-age=900").send(renderStatsCard(username, profile, theme));
+  } catch (error) {
+    sendProfileError(res, error);
   }
 });
 

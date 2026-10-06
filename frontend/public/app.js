@@ -12,6 +12,8 @@ const results     = document.getElementById("results");
 const searchHint  = document.getElementById("search-hint");
 const btnText     = searchBtn.querySelector(".btn-text");
 const btnSpinner  = searchBtn.querySelector(".btn-spinner");
+const compareInput = document.getElementById("compare-input");
+const compareBtn = document.getElementById("compare-btn");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 46; // SVG ring circumference (r=46)
@@ -150,7 +152,7 @@ function buildHeatmap(calendarStr) {
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function render(userData, calData, recentData, username) {
+function render(userData, calData, recentData, username, progress = []) {
   const aq = userData.allQuestionsCount;
   const ac = userData.matchedUser.submitStats.acSubmissionNum;
   const ts = userData.matchedUser.submitStats.totalSubmissionNum;
@@ -286,6 +288,21 @@ function render(userData, calData, recentData, username) {
               <span class="topic-count">${topic.solved}</span>
             </div>`).join("") || `<div class="empty-state">No topic data available.</div>`}
         </div>
+
+        <div class="analytics-section">
+          <div class="section-title">// progress history</div>
+          ${progress.length > 1 ? `
+            <div class="progress-chart">
+              <svg viewBox="0 0 600 150" role="img" aria-label="Solved problem growth">
+                <polyline points="${progress.map((entry, index) => {
+                  const max = Math.max(...progress.map(item => item.totalSolved), 1);
+                  const x = (index / (progress.length - 1)) * 580 + 10;
+                  const y = 135 - (entry.totalSolved / max) * 110;
+                  return `${x},${y}`;
+                }).join(" ")}" />
+              </svg>
+            </div>` : `<div class="muted">Daily snapshots will build this chart over time.</div>`}
+        </div>
         <div class="weak-topics">
           <div class="analytics-label">Focus next</div>
           ${weakTopics.map(topic => `<span class="weak-topic">${escapeHTML(topic)}</span>`).join("") || `<span class="muted">No weak topics found.</span>`}
@@ -336,10 +353,11 @@ function render(userData, calData, recentData, username) {
 async function fetchAll(username) {
   showSkeleton();
   try {
-    const [userRes, calRes, recentRes] = await Promise.allSettled([
+    const [userRes, calRes, recentRes, progressRes] = await Promise.allSettled([
       fetch(`${API_BASE}/api/user/${username}`),
       fetch(`${API_BASE}/api/user/${username}/calendar`),
       fetch(`${API_BASE}/api/user/${username}/recent`),
+      fetch(`${API_BASE}/api/user/${username}/progress?days=30`),
     ]);
 
     // Main user data is required
@@ -355,8 +373,10 @@ async function fetchAll(username) {
       ? await calRes.value.json() : null;
     const recentData = recentRes.status === "fulfilled" && recentRes.value.ok
       ? await recentRes.value.json() : [];
+    const progressData = progressRes.status === "fulfilled" && progressRes.value.ok
+      ? await progressRes.value.json() : { history: [] };
 
-    render(userData, calData, recentData, username);
+    render(userData, calData, recentData, username, progressData.history);
   } catch (err) {
     results.innerHTML = `
       <div class="empty-state">
@@ -381,6 +401,38 @@ async function handleSearch() {
 }
 
 searchBtn.addEventListener("click", handleSearch);
+compareBtn.addEventListener("click", async () => {
+  const first = userInput.value.trim();
+  const second = compareInput.value.trim();
+  const firstError = validate(first);
+  const secondError = validate(second);
+  if (firstError || secondError) {
+    searchHint.textContent = firstError || secondError;
+    return;
+  }
+  setLoading(true);
+  results.innerHTML = `<div class="skeleton-section">Loading comparison…</div>`;
+  try {
+    const response = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(first)}/${encodeURIComponent(second)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || data.error || "Unable to compare profiles.");
+    results.innerHTML = `
+      <div class="analytics-section">
+        <div class="section-title">// head-to-head</div>
+        <div class="comparison-grid">${data.users.map(user => `
+          <div class="comparison-user">
+            <strong>@${escapeHTML(user.username)}</strong>
+            <span>${user.solved} solved</span>
+            <span>${user.streaks.current} day streak</span>
+            <span>${user.contestRating ? Math.round(user.contestRating) : "—"} contest rating</span>
+          </div>`).join("")}</div>
+      </div>`;
+  } catch (error) {
+    results.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="err-msg">${escapeHTML(error.message)}</div></div>`;
+  } finally {
+    setLoading(false);
+  }
+});
 userInput.addEventListener("keydown", e => {
   if (e.key === "Enter") handleSearch();
 });
