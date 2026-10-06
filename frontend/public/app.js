@@ -19,16 +19,18 @@ const themeToggle = document.getElementById("theme-toggle");
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 46; // SVG ring circumference (r=46)
 
-function setTheme(theme) {
+function setTheme(theme, persist = true) {
   const light = theme === "light";
   document.documentElement.dataset.theme = light ? "light" : "dark";
   themeToggle.textContent = light ? "◐ Dark" : "☼ Light";
   themeToggle.setAttribute("aria-label", light ? "Switch to dark theme" : "Switch to light theme");
   themeToggle.setAttribute("aria-pressed", String(light));
-  localStorage.setItem("leetmatric-theme", light ? "light" : "dark");
+  if (persist) localStorage.setItem("codeatlas-theme", light ? "light" : "dark");
 }
 
-setTheme(localStorage.getItem("leetmatric-theme") || "dark");
+const savedTheme = localStorage.getItem("codeatlas-theme") || localStorage.getItem("leetmatric-theme");
+const preferredTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+setTheme(savedTheme || preferredTheme, false);
 themeToggle.addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
 
 function validate(username) {
