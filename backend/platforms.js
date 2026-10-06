@@ -54,7 +54,7 @@ async function getCodeforces(username) {
 async function getCodeChef(username) {
   try {
     const data = await getText(`https://www.codechef.com/users/${encodeURIComponent(username)}`);
-    const rating = data.match(/rating-number[^>]*>([^<]+)/i)?.[1]?.trim() || null;
+    const rating = data.match(/class=["']rating-number["'][^>]*>\s*([\d,]+)/i)?.[1]?.replace(/,/g, "") || null;
     const hasPublicProfile = /"currentUser"\s*:\s*"[^"]+"/i.test(data);
     return {
       provider: "CodeChef",
