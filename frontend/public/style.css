@@ -416,6 +416,36 @@ body {
   align-items: center;
   gap: 0.75rem;
 }
+.analytics-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  animation: fadeUp 0.4s 0.18s ease both;
+}
+.topic-layout { display: grid; grid-template-columns: 1fr 150px; gap: 1.25rem; }
+.topic-bars { display: flex; flex-direction: column; gap: .55rem; }
+.topic-row { display: grid; grid-template-columns: 105px 1fr 32px; align-items: center; gap: .6rem; }
+.topic-name, .topic-count, .analytics-label, .contest-summary span {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+}
+.topic-name { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topic-count { color: var(--accent2); text-align: right; }
+.topic-track { height: 8px; background: var(--surface3); border-radius: 10px; overflow: hidden; }
+.topic-track span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--easy)); border-radius: inherit; }
+.weak-topics { border-left: 1px solid var(--border); padding-left: 1rem; }
+.analytics-label { color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .6rem; }
+.weak-topic { display: block; color: var(--medium); font-size: .78rem; margin: .35rem 0; }
+.muted { color: var(--text3); font-size: .75rem; }
+.contest-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin-bottom: 1rem; }
+.contest-summary div { background: var(--surface2); border-radius: 10px; padding: .65rem; }
+.contest-summary strong { display: block; color: var(--accent2); font-family: var(--font-mono); font-size: .95rem; }
+.contest-summary span { color: var(--text3); text-transform: uppercase; }
+.rating-chart { background: var(--surface2); border-radius: 10px; padding: .75rem; }
+.rating-chart svg { width: 100%; height: auto; display: block; }
+.rating-chart polyline { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.rating-chart circle { fill: var(--easy); stroke: var(--surface2); stroke-width: 2; }
 .streak-icon { font-size: 1.5rem; }
 .streak-info {}
 .streak-num {
@@ -557,6 +587,11 @@ body {
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 560px) {
+  .topic-layout { grid-template-columns: 1fr; }
+  .weak-topics { border-left: 0; border-top: 1px solid var(--border); padding: 1rem 0 0; }
+  .contest-summary { grid-template-columns: repeat(2, 1fr); }
 }
 @keyframes shimmer {
   to { background-position: -200% 0; }

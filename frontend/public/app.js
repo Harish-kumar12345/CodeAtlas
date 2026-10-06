@@ -41,6 +41,12 @@ function pct(solved, total) {
   return total > 0 ? ((solved / total) * 100).toFixed(1) : "0.0";
 }
 
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[char]));
+}
+
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function showSkeleton() {
   results.innerHTML = `
@@ -153,6 +159,14 @@ function render(userData, calData, recentData, username) {
   const totals  = { easy: aq[1].count, medium: aq[2].count, hard: aq[3].count };
   const solved  = { easy: ac[1].count, medium: ac[2].count, hard: ac[3].count };
   const subs    = { all: ts[0].submissions, easy: ts[1].submissions, medium: ts[2].submissions, hard: ts[3].submissions };
+  const analytics = userData.analytics || {};
+  const topics = analytics.topics || [];
+  const weakTopics = analytics.weakTopics || [];
+  const contestHistory = analytics.contests?.history || [];
+  const maxTopicSolved = Math.max(...topics.map(topic => topic.solved), 1);
+  const maxRating = Math.max(...contestHistory.map(contest => contest.rating), 1);
+  const minRating = Math.min(...contestHistory.map(contest => contest.rating), maxRating);
+  const ratingRange = Math.max(maxRating - minRating, 1);
 
   // Profile
   const avatarHTML = profile.userAvatar
@@ -185,8 +199,8 @@ function render(userData, calData, recentData, username) {
     <div class="profile-card">
       ${avatarHTML}
       <div class="profile-info">
-        <div class="profile-name">${profile.realName || username}</div>
-        <div class="profile-username">@${username}</div>
+        <div class="profile-name">${escapeHTML(profile.realName || username)}</div>
+        <div class="profile-username">@${escapeHTML(username)}</div>
         <div class="profile-rank">
           <span>Global Rank</span>
           <span class="rank-badge">#${profile.ranking?.toLocaleString() || "—"}</span>
@@ -216,17 +230,17 @@ function render(userData, calData, recentData, username) {
         <div class="stat-card">
           <div class="stat-label">Easy Submissions</div>
           <div class="stat-value easy">${subs.easy.toLocaleString()}</div>
-          <div class="stat-sub">${pct(solved.easy, totals.easy)}% acceptance</div>
+          <div class="stat-sub">${analytics.difficulty?.[0]?.acceptanceRate ?? "—"}% acceptance</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Medium Submissions</div>
           <div class="stat-value medium">${subs.medium.toLocaleString()}</div>
-          <div class="stat-sub">${pct(solved.medium, totals.medium)}% acceptance</div>
+          <div class="stat-sub">${analytics.difficulty?.[1]?.acceptanceRate ?? "—"}% acceptance</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Hard Submissions</div>
           <div class="stat-value hard">${subs.hard.toLocaleString()}</div>
-          <div class="stat-sub">${pct(solved.hard, totals.hard)}% acceptance</div>
+          <div class="stat-sub">${analytics.difficulty?.[2]?.acceptanceRate ?? "—"}% acceptance</div>
         </div>
       </div>
     </div>
@@ -238,19 +252,71 @@ function render(userData, calData, recentData, username) {
         <div class="streak-pill">
           <div class="streak-icon">🔥</div>
           <div class="streak-info">
-            <div class="streak-num">${calData?.streak ?? "—"}</div>
-            <div class="streak-lbl">Day Streak</div>
+            <div class="streak-num">${analytics.streaks?.current ?? calData?.streak ?? "—"}</div>
+            <div class="streak-lbl">Current Streak</div>
           </div>
         </div>
         <div class="streak-pill">
           <div class="streak-icon">📅</div>
           <div class="streak-info">
-            <div class="streak-num">${calData?.totalActiveDays ?? "—"}</div>
+            <div class="streak-num">${analytics.streaks?.longest ?? "—"}</div>
+            <div class="streak-lbl">Longest Streak</div>
+          </div>
+          <div class="streak-pill">
+            <div class="streak-icon">📅</div>
+            <div class="streak-info">
+            <div class="streak-num">${analytics.streaks?.totalActiveDays ?? calData?.totalActiveDays ?? "—"}</div>
             <div class="streak-lbl">Active Days</div>
+            </div>
           </div>
         </div>
       </div>
       <div class="heatmap-wrap">${heatmapHTML}</div>
+    </div>
+
+    <!-- Topics -->
+    <div class="analytics-section">
+      <div class="section-title">// topic strengths</div>
+      <div class="topic-layout">
+        <div class="topic-bars">
+          ${topics.slice(0, 12).map(topic => `
+            <div class="topic-row">
+              <span class="topic-name">${escapeHTML(topic.topic)}</span>
+              <div class="topic-track"><span style="width:${(topic.solved / maxTopicSolved) * 100}%"></span></div>
+              <span class="topic-count">${topic.solved}</span>
+            </div>`).join("") || `<div class="empty-state">No topic data available.</div>`}
+        </div>
+        <div class="weak-topics">
+          <div class="analytics-label">Focus next</div>
+          ${weakTopics.map(topic => `<span class="weak-topic">${escapeHTML(topic)}</span>`).join("") || `<span class="muted">No weak topics found.</span>`}
+        </div>
+      </div>
+    </div>
+
+    <!-- Contest history -->
+    <div class="analytics-section">
+      <div class="section-title">// contest rating</div>
+      <div class="contest-summary">
+        <div><strong>${analytics.contests?.contestsAttended || 0}</strong><span>attended</span></div>
+        <div><strong>${analytics.contests?.bestRank ? `#${analytics.contests.bestRank.toLocaleString()}` : "—"}</strong><span>best rank</span></div>
+        <div><strong>+${analytics.contests?.biggestRatingGain || 0}</strong><span>biggest gain</span></div>
+        <div><strong>${analytics.contests?.biggestRatingDrop || 0}</strong><span>biggest drop</span></div>
+      </div>
+      ${contestHistory.length > 1 ? `
+        <div class="rating-chart" aria-label="Contest rating history">
+          <svg viewBox="0 0 600 180" role="img">
+            <polyline points="${contestHistory.map((contest, index) => {
+              const x = (index / (contestHistory.length - 1)) * 580 + 10;
+              const y = 165 - ((contest.rating - minRating) / ratingRange) * 140;
+              return `${x},${y}`;
+            }).join(" ")}" />
+            ${contestHistory.map((contest, index) => {
+              const x = (index / (contestHistory.length - 1)) * 580 + 10;
+              const y = 165 - ((contest.rating - minRating) / ratingRange) * 140;
+              return `<circle cx="${x}" cy="${y}" r="3" aria-label="${escapeHTML(contest.title)}: ${contest.rating}" />`;
+            }).join("")}
+          </svg>
+        </div>` : `<div class="empty-state">Not enough contest history to draw a graph.</div>`}
     </div>
 
     <!-- Recent Submissions -->
@@ -279,8 +345,8 @@ async function fetchAll(username) {
     // Main user data is required
     if (userRes.status === "rejected" || !userRes.value.ok) {
       const msg = userRes.status === "rejected"
-        ? "Server unreachable. Is the backend running?"
-        : await userRes.value.json().then(d => d.error).catch(() => "Unknown error");
+        ? "The server is waking up or unreachable. Please try again in a few seconds."
+        : await userRes.value.json().then(d => d.error).catch(() => "Unable to load this profile.");
       throw new Error(msg);
     }
 

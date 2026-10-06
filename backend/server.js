@@ -2,6 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const fetch = require("node-fetch");
 const rateLimit = require("express-rate-limit");
+const {
+  buildHeatmap,
+  calcStreaks,
+  contestSummary,
+  difficultySummary,
+  findWeakTopics,
+  getTopicStats,
+} = require("./analytics");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +39,29 @@ const STATS_QUERY = `
         acSubmissionNum { difficulty count submissions }
         totalSubmissionNum { difficulty count submissions }
       }
+      tagProblemCounts {
+        fundamental { tagName problemsSolved }
+        intermediate { tagName problemsSolved }
+        advanced { tagName problemsSolved }
+      }
+    }
+  }
+`;
+
+const CONTEST_QUERY = `
+  query userContestRankingInfo($username: String!) {
+    userContestRanking(username: $username) {
+      attendedContestsCount
+      rating
+      globalRanking
+      totalParticipants
+      topPercentage
+    }
+    userContestRankingHistory(username: $username) {
+      attended
+      rating
+      ranking
+      contest { title startTime }
     }
   }
 `;
@@ -71,7 +102,9 @@ async function leetcodeQuery(query, variables) {
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) throw new Error(`LeetCode returned ${res.status}`);
-  return res.json();
+  const payload = await res.json();
+  if (payload.errors?.length) throw new Error(payload.errors[0].message || "LeetCode query failed");
+  return payload;
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -89,7 +122,32 @@ app.get("/api/user/:username", async (req, res) => {
     if (!data?.data?.matchedUser) {
       return res.status(404).json({ error: "User not found" });
     }
-    res.json(data.data);
+    const user = data.data.matchedUser;
+    const topics = getTopicStats(username, user.tagProblemCounts);
+    const calendarData = await leetcodeQuery(CALENDAR_QUERY, {
+      username,
+      year: new Date().getFullYear(),
+    });
+    const calendar = calendarData?.data?.matchedUser?.userCalendar;
+    const contestData = await leetcodeQuery(CONTEST_QUERY, { username });
+    const calendarJson = calendar?.submissionCalendar || "{}";
+    res.json({
+      ...data.data,
+      analytics: {
+        difficulty: difficultySummary(
+          data.data.allQuestionsCount,
+          user.submitStats.acSubmissionNum,
+          user.submitStats.acSubmissionNum,
+          user.submitStats.totalSubmissionNum,
+        ),
+        topics,
+        weakTopics: findWeakTopics(topics),
+        heatmap: buildHeatmap(calendarJson),
+        streaks: calcStreaks(calendarJson),
+        contests: contestSummary(contestData?.data?.userContestRankingHistory),
+        contestRanking: contestData?.data?.userContestRanking || null,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: "Failed to reach LeetCode" });
@@ -122,7 +180,7 @@ app.get("/api/user/:username/calendar", async (req, res) => {
     const data = await leetcodeQuery(CALENDAR_QUERY, { username, year });
     const cal = data?.data?.matchedUser?.userCalendar;
     if (!cal) return res.status(404).json({ error: "Calendar not found" });
-    res.json(cal);
+    res.json({ ...cal, heatmap: buildHeatmap(cal.submissionCalendar), streaks: calcStreaks(cal.submissionCalendar) });
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: "Failed to reach LeetCode" });
