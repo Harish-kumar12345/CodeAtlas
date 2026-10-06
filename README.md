@@ -47,6 +47,7 @@ The backend serves the frontend from `frontend/public/` automatically.
 | GET | `/api/user/:username` | Profile, solved counts, submission stats |
 | GET | `/api/user/:username/recent` | Last 8 submissions |
 | GET | `/api/user/:username/calendar` | Streak, active days, heatmap data |
+| GET | `/health` | Service and LeetCode circuit health |
 
 ## Features
 
@@ -58,6 +59,7 @@ The backend serves the frontend from `frontend/public/` automatically.
 - **Recent submissions** — last 8 attempts with status, language, time
 - **Skeleton loaders** — smooth loading states
 - **Rate limiting** — 30 req/min per IP to protect the proxy
+- **Upstream resilience** — bounded LeetCode retries, circuit breaking, and retry-aware errors
 - **Daily snapshots** — SQLite-backed progress history and growth chart
 - **User comparison** — compare solved counts, streaks, and contest ratings
 - **Shareable cards** — `/card/<username>.svg?theme=dark` or `theme=light`
@@ -75,6 +77,8 @@ The backend serves the frontend from `frontend/public/` automatically.
 Works on any Node host: **Railway**, **Render**, **Fly.io**, **VPS**.
 
 Set `PORT` environment variable if needed (defaults to `3000`).
+Set `FRONTEND_ORIGIN` to the deployed frontend origin when cross-origin API
+access is required. Same-origin local development works without it.
 
 ## Testing and deployment
 

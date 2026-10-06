@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const fetch = require("node-fetch");
+const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const { TtlCache } = require("./cache");
 const {
@@ -34,11 +35,40 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const profileCache = new TtlCache();
 const endpointCache = new TtlCache();
+const circuit = { failures: 0, openedAt: 0 };
+const CIRCUIT_FAILURE_LIMIT = 3;
+const CIRCUIT_COOLDOWN_MS = 30 * 1000;
+const upstreamRetryDelay = (attempt) => 250 * (2 ** attempt) + Math.floor(Math.random() * 150);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors());
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Origin not allowed"));
+  },
+}));
 app.use(express.json());
 app.use(express.static("../frontend/public"));
+app.use((req, res, next) => {
+  const requestId = req.get("X-Request-ID") || crypto.randomUUID();
+  req.requestId = requestId;
+  res.set("X-Request-ID", requestId);
+  next();
+});
+
+function sendError(res, status, code, message, retryable = false) {
+  return res.status(status).json({ code, message, retryable });
+}
+
+app.get("/health", (_req, res) => {
+  const circuitOpen = circuit.openedAt > 0 && Date.now() - circuit.openedAt < CIRCUIT_COOLDOWN_MS;
+  res.status(circuitOpen ? 503 : 200).json({
+    status: circuitOpen ? "degraded" : "ok",
+    service: "leetmatric",
+    upstream: circuitOpen ? "open" : "available",
+  });
+});
 
 // Rate limiter: max 30 requests per minute per IP
 const limiter = rateLimit({
@@ -46,10 +76,10 @@ const limiter = rateLimit({
   max: 30,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  handler: (_req, res) => res.status(429).json({
-    error: "Rate limit exceeded",
-    message: "Too many requests. Please wait a minute and try again.",
-  }),
+  handler: (req, res) => {
+    res.set("Retry-After", "60");
+    return sendError(res, 429, "RATE_LIMITED", "Too many requests. Please wait a minute and try again.", true);
+  },
 });
 app.use("/api/", limiter);
 
@@ -118,38 +148,54 @@ const CALENDAR_QUERY = `
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 async function leetcodeQuery(query, variables) {
-  let res;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  try {
-    res = await fetch(LEETCODE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Referer": "https://leetcode.com",
-        "User-Agent": "Mozilla/5.0",
-      },
-      body: JSON.stringify({ query, variables }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    error.code = error.name === "AbortError" ? "LEETCODE_TIMEOUT" : "LEETCODE_UNAVAILABLE";
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
-  if (!res.ok) {
-    const error = new Error(`LeetCode returned ${res.status}`);
-    error.code = res.status === 429 ? "LEETCODE_RATE_LIMITED" : "LEETCODE_UNAVAILABLE";
+  if (circuit.openedAt && Date.now() - circuit.openedAt < CIRCUIT_COOLDOWN_MS) {
+    const error = new Error("LeetCode circuit is open");
+    error.code = "LEETCODE_CIRCUIT_OPEN";
     throw error;
   }
-  const payload = await res.json();
-  if (payload.errors?.length) {
-    const error = new Error(payload.errors[0].message || "LeetCode query failed");
-    error.code = "LEETCODE_UNAVAILABLE";
-    throw error;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let res;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      res = await fetch(LEETCODE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Referer: "https://leetcode.com", "User-Agent": "Mozilla/5.0" },
+        body: JSON.stringify({ query, variables }),
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        if (payload.errors?.length) {
+          const error = new Error(payload.errors[0].message || "LeetCode query failed");
+          error.code = /does not exist|not found/i.test(error.message)
+            ? "USER_NOT_FOUND"
+            : "LEETCODE_UNAVAILABLE";
+          throw error;
+        }
+        circuit.failures = 0;
+        circuit.openedAt = 0;
+        return payload;
+      }
+      const error = new Error(`LeetCode returned ${res.status}`);
+      error.code = res.status === 429 ? "LEETCODE_RATE_LIMITED" : "LEETCODE_UNAVAILABLE";
+      throw error;
+    } catch (error) {
+      const retryable = ["LEETCODE_TIMEOUT", "LEETCODE_RATE_LIMITED", "LEETCODE_UNAVAILABLE"].includes(error.code)
+        || error.name === "FetchError" || error.name === "AbortError";
+      error.code = error.name === "AbortError" ? "LEETCODE_TIMEOUT" : (error.code || "LEETCODE_UNAVAILABLE");
+      if (!retryable || attempt === 2) {
+        if (retryable) {
+          circuit.failures += 1;
+          if (circuit.failures >= CIRCUIT_FAILURE_LIMIT) circuit.openedAt = Date.now();
+        }
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, upstreamRetryDelay(attempt)));
+    } finally {
+      clearTimeout(timeout);
+    }
   }
-  return payload;
 }
 
 function cachedResponse(cache, key) {
@@ -160,21 +206,15 @@ function cachedResponse(cache, key) {
 function sendUpstreamError(res, error) {
   console.error(error);
   if (error.code === "LEETCODE_RATE_LIMITED") {
-    return res.status(503).json({
-      error: "LeetCode is rate limiting requests",
-      message: "LeetCode is temporarily limiting requests. Please try again shortly.",
-    });
+    return sendError(res, 503, "LEETCODE_RATE_LIMITED", "LeetCode is temporarily limiting requests. Please try again shortly.", true);
+  }
+  if (error.code === "LEETCODE_CIRCUIT_OPEN") {
+    return sendError(res, 503, "LEETCODE_CIRCUIT_OPEN", "LeetCode is temporarily unavailable. Please try again in a few seconds.", true);
   }
   if (error.code === "LEETCODE_TIMEOUT") {
-    return res.status(504).json({
-      error: "LeetCode request timed out",
-      message: "LeetCode is taking too long to respond. Please try again shortly.",
-    });
+    return sendError(res, 504, "LEETCODE_TIMEOUT", "LeetCode is taking too long to respond. Please try again shortly.", true);
   }
-  return res.status(502).json({
-    error: "LeetCode is unavailable",
-    message: "LeetCode could not be reached. Please try again shortly.",
-  });
+  return sendError(res, 502, "LEETCODE_UNAVAILABLE", "LeetCode could not be reached. Please try again shortly.", true);
 }
 
 async function loadProfile(username) {
@@ -221,7 +261,7 @@ async function loadProfile(username) {
 
 function sendProfileError(res, error) {
   if (error.code === "USER_NOT_FOUND") {
-    return res.status(404).json({ error: "User not found", message: "No public LeetCode profile was found for this username." });
+    return sendError(res, 404, "USER_NOT_FOUND", "No public LeetCode profile was found for this username.");
   }
   return sendUpstreamError(res, error);
 }

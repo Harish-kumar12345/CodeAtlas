@@ -195,6 +195,20 @@ function escapeHTML(value) {
   }[char]));
 }
 
+function renderError(message, retryable = true) {
+  results.innerHTML = `
+    <div class="empty-state">
+      <div class="icon">⚠️</div>
+      <div class="err-msg">${escapeHTML(message)}</div>
+      <div>${retryable ? "The service may be waking up or temporarily unavailable." : "Check the username and try again."}</div>
+      ${retryable ? '<button type="button" class="dashboard-action primary" data-retry-search>Retry</button>' : ""}
+    </div>`;
+}
+
+document.addEventListener("click", event => {
+  if (event.target.closest("[data-retry-search]")) handleSearch();
+});
+
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function showSkeleton() {
   results.innerHTML = `
@@ -276,17 +290,16 @@ async function fetchPlatformProfile(username, platform) {
   showSkeleton();
   try {
     const response = await fetch(`${API_BASE}/api/platform/${encodeURIComponent(platform)}/${encodeURIComponent(username)}`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || data.error || "Unable to load this profile.");
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.message || data.error || "Unable to load this profile.");
+      error.retryable = data.retryable !== false && response.status >= 500;
+      throw error;
+    }
     renderPlatformProfile(platform, data.profile);
     updatePlatformPreview(platform, data.profile);
   } catch (error) {
-    results.innerHTML = `
-      <div class="empty-state">
-        <div class="icon">⚠️</div>
-        <div class="err-msg">${escapeHTML(error.message)}</div>
-        <div>Check the public username and try again.</div>
-      </div>`;
+    renderError(error.message, error.retryable !== false);
   }
 }
 
@@ -670,10 +683,15 @@ async function fetchAll(username) {
 
     // Main user data is required
     if (userRes.status === "rejected" || !userRes.value.ok) {
-      const msg = userRes.status === "rejected"
-        ? "The server is waking up or unreachable. Please try again in a few seconds."
-        : await userRes.value.json().then(d => d.message || d.error).catch(() => "Unable to load this profile.");
-      throw new Error(msg);
+      if (userRes.status === "rejected") {
+        const error = new Error("The server is waking up or unreachable. Please try again in a few seconds.");
+        error.retryable = true;
+        throw error;
+      }
+      const errorData = await userRes.value.json().catch(() => ({}));
+      const error = new Error(errorData.message || errorData.error || "Unable to load this profile.");
+      error.retryable = errorData.retryable !== false;
+      throw error;
     }
 
     const userData   = await userRes.value.json();
@@ -767,12 +785,7 @@ async function fetchAll(username) {
       }
     });
   } catch (err) {
-    results.innerHTML = `
-      <div class="empty-state">
-        <div class="icon">⚠️</div>
-        <div class="err-msg">${err.message}</div>
-        <div>${err.message.includes("private") ? "Try a public LeetCode profile." : "Check the username and try again."}</div>
-      </div>`;
+    renderError(err.message, err.retryable !== false);
   }
 }
 
