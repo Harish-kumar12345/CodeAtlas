@@ -5,6 +5,8 @@
   "scripts": {
     "start": "cd backend && node server.js",
     "dev":   "cd backend && npx nodemon server.js",
-    "install": "cd backend && npm install"
+    "install": "cd backend && npm install",
+    "test": "cd backend && npm test",
+    "audit": "cd backend && npm audit --audit-level=high"
   }
 }

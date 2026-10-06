@@ -115,6 +115,18 @@ cd backend
 npm test
 ```
 
+From the repository root, `npm test` runs the same backend suite and
+`npm run audit` checks high-and-critical dependency advisories. GitHub Actions
+runs tests, the dependency audit, and a Docker build on pushes and pull
+requests.
+
+The current audit reports advisories in the native `sqlite3` build toolchain
+and development watcher transitive dependencies. The non-breaking
+`npm audit fix` pass was applied; clearing the remaining findings requires
+major upgrades (`sqlite3` 6 or an alternative driver, and a nodemon downgrade)
+and is intentionally deferred until compatibility is tested. The CI audit is
+non-blocking so these findings remain visible without masking test failures.
+
 Build and run the production container:
 
 ```bash
