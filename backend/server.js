@@ -3,15 +3,20 @@ const cors = require("cors");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
+const { randomBytes } = require("crypto");
 const { TtlCache } = require("./cache");
 const {
   addGroupMember,
   getGoal,
   getGroupMembers,
   getProgressHistory,
+  getUserById,
+  deleteUser,
   saveGoal,
   saveSnapshot,
+  upsertUser,
 } = require("./database");
+const { clearCookie, createToken, getCookie, readToken, setCookie } = require("./auth");
 const { renderStatsCard } = require("./cards");
 const { createStudyPlan, recommendProblems } = require("./engagement");
 const {
@@ -82,6 +87,75 @@ const limiter = rateLimit({
   },
 });
 app.use("/api/", limiter);
+
+function currentUser(req) {
+  return readToken(getCookie(req, "codeatlas_session"));
+}
+
+function requireUser(req, res, next) {
+  const session = currentUser(req);
+  if (!session) return sendError(res, 401, "AUTH_REQUIRED", "Please sign in to continue.", false);
+  req.user = session;
+  return next();
+}
+
+app.get("/auth/github", (req, res) => {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return sendError(res, 503, "OAUTH_NOT_CONFIGURED", "GitHub sign-in is not configured on this server.", false);
+  }
+  const state = randomBytes(24).toString("hex");
+  setCookie(res, "codeatlas_oauth_state", createToken({ state }, 600), 600);
+  const callback = process.env.GITHUB_CALLBACK_URL || `${req.protocol}://${req.get("host")}/auth/github/callback`;
+  const params = new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID, redirect_uri: callback, scope: "read:user user:email", state });
+  return res.redirect(`https://github.com/login/oauth/authorize?${params}`);
+});
+
+app.get("/auth/github/callback", async (req, res) => {
+  const state = readToken(getCookie(req, "codeatlas_oauth_state"));
+  clearCookie(res, "codeatlas_oauth_state");
+  if (!state || state.state !== req.query.state) return sendError(res, 400, "OAUTH_STATE_INVALID", "Sign-in could not be verified. Please try again.", false);
+  if (!req.query.code || !process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return sendError(res, 503, "OAUTH_NOT_CONFIGURED", "GitHub sign-in is not configured on this server.", false);
+  }
+  try {
+    const callback = process.env.GITHUB_CALLBACK_URL || `${req.protocol}://${req.get("host")}/auth/github/callback`;
+    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json", "User-Agent": "CodeAtlas/1.0" },
+      body: JSON.stringify({ client_id: process.env.GITHUB_CLIENT_ID, client_secret: process.env.GITHUB_CLIENT_SECRET, code: req.query.code, redirect_uri: callback }),
+    });
+    const token = await tokenResponse.json();
+    if (!token.access_token) return sendError(res, 502, "OAUTH_EXCHANGE_FAILED", "GitHub sign-in could not be completed.", true);
+    const profileResponse = await fetch("https://api.github.com/user", { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token.access_token}`, "User-Agent": "CodeAtlas/1.0" } });
+    const profile = await profileResponse.json();
+    if (!profileResponse.ok || !profile.id) return sendError(res, 502, "OAUTH_PROFILE_FAILED", "GitHub profile could not be loaded.", true);
+    const user = await upsertUser({ provider: "github", providerSubject: profile.id, email: profile.email, displayName: profile.name || profile.login, avatarUrl: profile.avatar_url });
+    setCookie(res, "codeatlas_session", createToken({ userId: String(user.id), provider: user.provider }), 7 * 24 * 60 * 60);
+    return res.redirect("/");
+  } catch (error) {
+    console.error(error);
+    return sendError(res, 502, "OAUTH_UNAVAILABLE", "GitHub sign-in is temporarily unavailable.", true);
+  }
+});
+
+app.get("/auth/logout", (req, res) => {
+  clearCookie(res, "codeatlas_session");
+  res.redirect("/");
+});
+
+app.get("/api/me", async (req, res) => {
+  const session = currentUser(req);
+  if (!session) return res.json({ user: null });
+  const user = await getUserById(session.userId);
+  if (!user) clearCookie(res, "codeatlas_session");
+  return res.json({ user: user || null });
+});
+
+app.delete("/api/me", requireUser, async (req, res) => {
+  await deleteUser(req.user.userId);
+  clearCookie(res, "codeatlas_session");
+  return res.status(204).send();
+});
 
 // ── GraphQL Queries ──────────────────────────────────────────────────────────
 const LEETCODE_URL = "https://leetcode.com/graphql/";

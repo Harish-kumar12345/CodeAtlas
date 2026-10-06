@@ -53,6 +53,18 @@ const engagementReady = ready
     username TEXT NOT NULL,
     PRIMARY KEY (group_code, username)
   )`));
+const authReady = engagementReady.then(() => run(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    provider_subject TEXT NOT NULL,
+    email TEXT,
+    display_name TEXT,
+    avatar_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (provider, provider_subject)
+  )`));
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -115,11 +127,36 @@ async function getGroupMembers(groupCode) {
   return all("SELECT username FROM group_members WHERE group_code = ? ORDER BY username", [groupCode.toLowerCase()]);
 }
 
+async function upsertUser(user) {
+  await authReady;
+  const now = new Date().toISOString();
+  await run(`
+    INSERT INTO users (provider, provider_subject, email, display_name, avatar_url, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(provider, provider_subject) DO UPDATE SET
+      email = excluded.email, display_name = excluded.display_name,
+      avatar_url = excluded.avatar_url, updated_at = excluded.updated_at
+  `, [user.provider, String(user.providerSubject), user.email || null, user.displayName || null, user.avatarUrl || null, now, now]);
+  const rows = await all("SELECT id, provider, provider_subject AS providerSubject, email, display_name AS displayName, avatar_url AS avatarUrl FROM users WHERE provider = ? AND provider_subject = ?", [user.provider, String(user.providerSubject)]);
+  return rows[0];
+}
+
+async function getUserById(id) {
+  await authReady;
+  const rows = await all("SELECT id, provider, provider_subject AS providerSubject, email, display_name AS displayName, avatar_url AS avatarUrl FROM users WHERE id = ?", [id]);
+  return rows[0] || null;
+}
+
+async function deleteUser(id) {
+  await authReady;
+  await run("DELETE FROM users WHERE id = ?", [id]);
+}
+
 async function closeDatabase() {
-  await engagementReady;
+  await authReady;
   return new Promise((resolve, reject) => {
     db.close((error) => error ? reject(error) : resolve());
   });
 }
 
-module.exports = { addGroupMember, closeDatabase, getGoal, getGroupMembers, getProgressHistory, saveGoal, saveSnapshot };
+module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, saveGoal, saveSnapshot, upsertUser };

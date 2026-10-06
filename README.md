@@ -80,6 +80,16 @@ Set `PORT` environment variable if needed (defaults to `3000`).
 Set `FRONTEND_ORIGIN` to the deployed frontend origin when cross-origin API
 access is required. Same-origin local development works without it.
 
+### GitHub sign-in
+
+GitHub OAuth is optional and disabled until these server environment variables
+are configured: `SESSION_SECRET`, `GITHUB_CLIENT_ID`,
+`GITHUB_CLIENT_SECRET`, and `GITHUB_CALLBACK_URL`. The callback URL must also
+be registered in the GitHub OAuth application. Sessions use signed,
+HttpOnly cookies; no passwords are stored. Use `/auth/github` to start login,
+`/auth/logout` to sign out, and `DELETE /api/me` to delete the signed-in
+account and its owned data.
+
 ## Testing and deployment
 
 Run the complete backend test suite:

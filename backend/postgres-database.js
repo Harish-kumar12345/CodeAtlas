@@ -199,8 +199,37 @@ async function getGroupMembers(groupCode) {
   return result.rows;
 }
 
+async function upsertUser(user) {
+  await ready;
+  const result = await pool.query(`
+    INSERT INTO users (provider, provider_subject, email, display_name, avatar_url)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (provider, provider_subject) DO UPDATE SET
+      email = EXCLUDED.email, display_name = EXCLUDED.display_name,
+      avatar_url = EXCLUDED.avatar_url, updated_at = NOW()
+    RETURNING id, provider, provider_subject AS "providerSubject", email,
+      display_name AS "displayName", avatar_url AS "avatarUrl"
+  `, [user.provider, String(user.providerSubject), user.email || null, user.displayName || null, user.avatarUrl || null]);
+  return result.rows[0];
+}
+
+async function getUserById(id) {
+  await ready;
+  const result = await pool.query(`
+    SELECT id, provider, provider_subject AS "providerSubject", email,
+      display_name AS "displayName", avatar_url AS "avatarUrl"
+    FROM users WHERE id = $1
+  `, [id]);
+  return result.rows[0] || null;
+}
+
+async function deleteUser(id) {
+  await ready;
+  await pool.query("DELETE FROM users WHERE id = $1", [id]);
+}
+
 async function closeDatabase() {
   await pool.end();
 }
 
-module.exports = { addGroupMember, closeDatabase, getGoal, getGroupMembers, getProgressHistory, saveGoal, saveSnapshot };
+module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, saveGoal, saveSnapshot, upsertUser };
