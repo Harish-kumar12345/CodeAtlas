@@ -14,9 +14,22 @@ const btnText     = searchBtn.querySelector(".btn-text");
 const btnSpinner  = searchBtn.querySelector(".btn-spinner");
 const compareInput = document.getElementById("compare-input");
 const compareBtn = document.getElementById("compare-btn");
+const themeToggle = document.getElementById("theme-toggle");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 46; // SVG ring circumference (r=46)
+
+function setTheme(theme) {
+  const light = theme === "light";
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+  themeToggle.textContent = light ? "◐ Dark" : "☼ Light";
+  themeToggle.setAttribute("aria-label", light ? "Switch to dark theme" : "Switch to light theme");
+  themeToggle.setAttribute("aria-pressed", String(light));
+  localStorage.setItem("leetmatric-theme", light ? "light" : "dark");
+}
+
+setTheme(localStorage.getItem("leetmatric-theme") || "dark");
+themeToggle.addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
 
 function validate(username) {
   if (!username.trim()) return "Username cannot be empty.";

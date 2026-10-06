@@ -32,7 +32,10 @@
         </div>
         <span class="logo-text">LeetMatric</span>
       </div>
-      <a href="https://leetcode.com" target="_blank" rel="noopener" class="header-link">leetcode.com ↗</a>
+      <div class="header-actions">
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch to light theme" aria-pressed="false">☼ Light</button>
+        <a href="https://leetcode.com" target="_blank" rel="noopener" class="header-link">leetcode.com ↗</a>
+      </div>
     </header>
 
     <!-- ── HERO SEARCH ── -->
@@ -48,8 +51,8 @@
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
           </div>
-          <input type="text" id="user-input" placeholder="e.g. neal_wu" autocomplete="off" spellcheck="false" maxlength="25" />
-          <button id="search-btn">
+          <input type="text" id="user-input" placeholder="e.g. neal_wu" autocomplete="off" spellcheck="false" maxlength="25" aria-label="LeetCode username" />
+          <button id="search-btn" type="button">
             <span class="btn-text">Search</span>
             <span class="btn-spinner" hidden>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -61,7 +64,7 @@
         <div class="search-hint" id="search-hint"></div>
       </div>
       <div class="compare-card">
-        <input type="text" id="compare-input" placeholder="Compare with another username" maxlength="25" />
+        <input type="text" id="compare-input" placeholder="Compare with another username" maxlength="25" aria-label="Username to compare" />
         <button id="compare-btn" type="button">Compare</button>
       </div>
     </section>

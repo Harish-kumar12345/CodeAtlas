@@ -76,6 +76,43 @@ Works on any Node host: **Railway**, **Render**, **Fly.io**, **VPS**.
 
 Set `PORT` environment variable if needed (defaults to `3000`).
 
+## Testing and deployment
+
+Run the complete backend test suite:
+
+```bash
+cd backend
+npm test
+```
+
+Build and run the production container:
+
+```bash
+docker build -t leetmatric .
+docker run --rm -p 3000:3000 --env-file .env leetmatric
+```
+
+The app now supports a persistent dark/light theme toggle, keyboard-visible
+focus states, responsive comparison controls, and accessible labels on the
+primary form controls.
+
+For Render, use `npm start` from the repository root or deploy the Dockerfile.
+Configure `PORT`, `DB_PATH`, and optional provider keys through Render
+environment variables. SQLite on the free tier is ephemeral.
+
+### Custom domain
+
+In Render, open **Settings → Custom Domains**, add your domain, and follow the
+DNS instructions shown for the service. Wait for DNS propagation, then verify
+HTTPS and redirect behavior.
+
+### Screenshots
+
+Capture screenshots from the deployed app after searching a public username.
+Recommended views are the profile overview, analytics dashboard, and light
+theme. Store real screenshots under `docs/screenshots/`; this repository does
+not include synthetic images.
+
 ### Optional AI study plans
 
 Set `AI_API_KEY` to enable study plans. The optional provider configuration is
