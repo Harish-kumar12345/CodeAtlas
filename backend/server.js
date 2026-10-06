@@ -13,6 +13,8 @@ const {
 } = require("./database");
 const { renderStatsCard } = require("./cards");
 const { createStudyPlan, recommendProblems } = require("./engagement");
+const { combinedScore, getPlatformProfiles } = require("./platforms");
+const { buildPdfReport } = require("./report");
 const {
   buildHeatmap,
   calcStreaks,
@@ -247,6 +249,33 @@ app.get("/api/user/:username/recommendations", async (req, res) => {
     const profile = await loadProfile(username);
     const recentData = await leetcodeQuery(RECENT_QUERY, { username });
     res.json({ problems: recommendProblems(profile.analytics.weakTopics, profile.analytics.difficulty, recentData.data?.recentSubmissionList || []) });
+  } catch (error) {
+    sendProfileError(res, error);
+  }
+});
+
+app.get("/api/user/:username/platforms", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  try {
+    const [profile, platforms] = await Promise.all([loadProfile(username), getPlatformProfiles(username)]);
+    res.json({ username, platforms, combinedScore: combinedScore(profile, platforms) });
+  } catch (error) {
+    sendProfileError(res, error);
+  }
+});
+
+app.get("/api/user/:username/report.pdf", async (req, res) => {
+  const { username } = req.params;
+  if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  try {
+    const [profile, platforms, history] = await Promise.all([
+      loadProfile(username),
+      getPlatformProfiles(username),
+      getProgressHistory(username, 365),
+    ]);
+    const pdf = await buildPdfReport(username, profile, platforms, history);
+    res.type("application/pdf").set("Content-Disposition", `attachment; filename="${username}-leetmatric-report.pdf"`).send(pdf);
   } catch (error) {
     sendProfileError(res, error);
   }

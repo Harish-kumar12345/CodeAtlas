@@ -208,6 +208,7 @@ body {
 .recommendation-item span { color: var(--text3); font-family: var(--font-mono); font-size: .65rem; }
 .study-plan-btn { margin-top: 1rem; border: 1px solid rgba(124,106,255,.4); border-radius: 9px; background: var(--accent); color: #fff; padding: .7rem 1rem; cursor: pointer; font-weight: 700; }
 .study-plan-output { white-space: pre-wrap; margin-top: 1rem; padding: .9rem; border-radius: 9px; background: var(--surface2); color: var(--text2); font-family: var(--font-mono); font-size: .7rem; }
+.export-link { display: inline-block; text-decoration: none; margin-top: 1rem; }
 
 /* ── Results ───────────────────────────────────────────────────────────── */
 .results {

@@ -309,6 +309,12 @@ function render(userData, calData, recentData, username, progress = [], recommen
           <div class="recommendation-list">
             ${recommendations.map(problem => `<a class="recommendation-item" href="${problem.url}" target="_blank" rel="noopener"><strong>${escapeHTML(problem.title)}</strong><span>${escapeHTML(problem.topic)} · ${escapeHTML(problem.difficulty)}</span></a>`).join("") || `<div class="muted">No recommendations available.</div>`}
           </div>
+
+          <div class="analytics-section">
+            <div class="section-title">// coding profile</div>
+            <div id="platform-summary" class="muted">Loading Codeforces, CodeChef and GitHub…</div>
+            <a class="study-plan-btn export-link" href="/api/user/${encodeURIComponent(username)}/report.pdf">Download PDF report</a>
+          </div>
           <button class="study-plan-btn" id="study-plan-btn" type="button">Generate 7-day AI study plan</button>
           <div id="study-plan-output" class="study-plan-output" hidden></div>
         </div>
@@ -389,6 +395,14 @@ async function fetchAll(username) {
       ? await recommendationsRes.value.json() : { problems: [] };
 
     render(userData, calData, recentData, username, progressData.history, recommendationsData.problems);
+    const platformSummary = document.getElementById("platform-summary");
+    fetch(`${API_BASE}/api/user/${encodeURIComponent(username)}/platforms`)
+      .then(response => response.json().then(data => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.message || data.error || "Platforms unavailable");
+        platformSummary.innerHTML = `<strong>Combined score: ${data.combinedScore}</strong><br>${Object.values(data.platforms).map(platform => `${escapeHTML(platform.provider)}: ${platform.available ? "available" : escapeHTML(platform.error)}`).join(" · ")}`;
+      })
+      .catch(error => { platformSummary.textContent = error.message; });
     document.getElementById("study-plan-btn")?.addEventListener("click", async (event) => {
       const output = document.getElementById("study-plan-output");
       event.currentTarget.disabled = true;
