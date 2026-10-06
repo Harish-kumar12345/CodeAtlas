@@ -772,6 +772,13 @@ async function fetchAll(username) {
       event.currentTarget.disabled = true;
       output.textContent = "Loading group…";
       try {
+        const joinResponse = await fetch(`${API_BASE}/api/groups/${encodeURIComponent(code)}/members`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+        const joinData = await joinResponse.json().catch(() => ({}));
+        if (!joinResponse.ok) throw new Error(joinData.message || joinData.error || "Sign in to join this group.");
         const response = await fetch(`${API_BASE}/api/groups/${encodeURIComponent(code)}/leaderboard`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || data.error || "Unable to load leaderboard.");

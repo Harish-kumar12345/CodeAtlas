@@ -5,7 +5,7 @@ const path = require("path");
 
 const tempPath = path.join(os.tmpdir(), `leetmatric-test-${Date.now()}.sqlite`);
 process.env.DB_PATH = tempPath;
-const { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserGoal, saveGoal, saveSnapshot, saveUserGoal, upsertUser } = require("./database");
+const { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserGoal, hasUserGroupMember, saveGoal, saveSnapshot, saveUserGoal, upsertUser } = require("./database");
 
 (async () => {
   const profile = {
@@ -27,8 +27,11 @@ const { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, get
   const user = await upsertUser({ provider: "github", providerSubject: "database-test", displayName: "Database Test" });
   await saveUserGoal(user.id, "tester", { dailyTarget: 4, remindersEnabled: false });
   assert.equal((await getUserGoal(user.id)).dailyTarget, 4);
+  await addUserGroupMember("friends", "tester", user.id);
+  assert.equal(await hasUserGroupMember("friends", user.id), true);
   await deleteUser(user.id);
   assert.equal(await getUserGoal(user.id), null);
+  assert.equal(await hasUserGroupMember("friends", user.id), false);
   await closeDatabase();
   fs.rmSync(tempPath, { force: true });
   console.log("database tests passed");

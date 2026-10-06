@@ -75,6 +75,13 @@ const userGoalReady = authReady.then(() => run(`
     updated_at TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`));
+const userGroupReady = userGoalReady.then(() => run(`
+  CREATE TABLE IF NOT EXISTS user_group_members (
+    user_id INTEGER NOT NULL,
+    group_code TEXT NOT NULL,
+    PRIMARY KEY (user_id, group_code),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`));
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -151,6 +158,18 @@ async function getGroupMembers(groupCode) {
   return all("SELECT username FROM group_members WHERE group_code = ? ORDER BY username", [groupCode.toLowerCase()]);
 }
 
+async function addUserGroupMember(groupCode, username, userId) {
+  await userGroupReady;
+  await addGroupMember(groupCode, username);
+  return run("INSERT OR IGNORE INTO user_group_members (user_id, group_code) VALUES (?, ?)", [userId, groupCode.toLowerCase()]);
+}
+
+async function hasUserGroupMember(groupCode, userId) {
+  await userGroupReady;
+  const rows = await all("SELECT 1 FROM user_group_members WHERE group_code = ? AND user_id = ?", [groupCode.toLowerCase(), userId]);
+  return rows.length > 0;
+}
+
 async function upsertUser(user) {
   await authReady;
   const now = new Date().toISOString();
@@ -174,6 +193,7 @@ async function getUserById(id) {
 async function deleteUser(id) {
   await authReady;
   await run("DELETE FROM user_goals WHERE user_id = ?", [id]);
+  await run("DELETE FROM user_group_members WHERE user_id = ?", [id]);
   await run("DELETE FROM users WHERE id = ?", [id]);
 }
 
@@ -184,4 +204,4 @@ async function closeDatabase() {
   });
 }
 
-module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, saveGoal, saveSnapshot, saveUserGoal, upsertUser };
+module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, saveGoal, saveSnapshot, saveUserGoal, upsertUser };

@@ -91,6 +91,11 @@ const ready = pool.query(`
     username TEXT NOT NULL,
     PRIMARY KEY (group_code, username)
   );
+  CREATE TABLE IF NOT EXISTS user_group_members (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    group_code TEXT NOT NULL,
+    PRIMARY KEY (user_id, group_code)
+  );
   CREATE TABLE IF NOT EXISTS study_plans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -232,6 +237,24 @@ async function getGroupMembers(groupCode) {
   return result.rows;
 }
 
+async function addUserGroupMember(groupCode, username, userId) {
+  await ready;
+  await addGroupMember(groupCode, username);
+  return pool.query(
+    "INSERT INTO user_group_members (user_id, group_code) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [userId, groupCode.toLowerCase()],
+  );
+}
+
+async function hasUserGroupMember(groupCode, userId) {
+  await ready;
+  const result = await pool.query(
+    "SELECT 1 FROM user_group_members WHERE group_code = $1 AND user_id = $2",
+    [groupCode.toLowerCase(), userId],
+  );
+  return result.rowCount > 0;
+}
+
 async function upsertUser(user) {
   await ready;
   const result = await pool.query(`
@@ -265,4 +288,4 @@ async function closeDatabase() {
   await pool.end();
 }
 
-module.exports = { addGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, saveGoal, saveSnapshot, saveUserGoal, upsertUser };
+module.exports = { addGroupMember, addUserGroupMember, closeDatabase, deleteUser, getGoal, getGroupMembers, getProgressHistory, getUserById, getUserGoal, hasUserGroupMember, saveGoal, saveSnapshot, saveUserGoal, upsertUser };

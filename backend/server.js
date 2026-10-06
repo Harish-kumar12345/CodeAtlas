@@ -7,11 +7,13 @@ const { randomBytes } = require("crypto");
 const { TtlCache } = require("./cache");
 const {
   addGroupMember,
+  addUserGroupMember,
   getGoal,
   getGroupMembers,
   getProgressHistory,
   getUserById,
   getUserGoal,
+  hasUserGroupMember,
   deleteUser,
   saveGoal,
   saveSnapshot,
@@ -480,20 +482,23 @@ app.put("/api/user/:username/goal", requireUser, async (req, res) => {
   res.json({ goal: await getUserGoal(req.user.id) });
 });
 
-app.post("/api/groups/:code/members", async (req, res) => {
+app.post("/api/groups/:code/members", requireUser, async (req, res) => {
   const code = req.params.code;
   const username = req.body?.username;
   if (!/^[a-zA-Z0-9_-]{3,32}$/.test(code) || !/^[a-zA-Z0-9_-]{1,25}$/.test(username || "")) {
     return res.status(400).json({ error: "Invalid group code or username" });
   }
-  await addGroupMember(code, username);
+  await addUserGroupMember(code, username, req.user.id);
   res.status(201).json({ groupCode: code, username });
 });
 
-app.get("/api/groups/:code/leaderboard", async (req, res) => {
+app.get("/api/groups/:code/leaderboard", requireUser, async (req, res) => {
   const code = req.params.code;
   if (!/^[a-zA-Z0-9_-]{3,32}$/.test(code)) return res.status(400).json({ error: "Invalid group code" });
   try {
+    if (!await hasUserGroupMember(code, req.user.id)) {
+      return sendError(res, 403, "GROUP_ACCESS_REQUIRED", "Join this group before viewing its leaderboard.", false);
+    }
     const members = await getGroupMembers(code);
     const leaderboard = await Promise.all(members.map(async ({ username }) => {
       const profile = await loadProfile(username);

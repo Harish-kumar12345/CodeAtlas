@@ -91,7 +91,9 @@ HttpOnly cookies; no passwords are stored. Use `/auth/github` to start login,
 account and its owned data. Goal reads/writes and AI study-plan generation
 require an authenticated session; public profile search remains available
 without login. Goals are stored by authenticated user ID rather than trusting
-the username in the URL.
+the username in the URL. Group membership and leaderboard access also require
+authentication; a signed-in user must join a group before its leaderboard can
+be read.
 
 ## Testing and deployment
 
