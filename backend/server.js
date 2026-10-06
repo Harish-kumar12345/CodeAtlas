@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const cors = require("cors");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -413,9 +414,30 @@ app.get("/", (req, res) => {
   res.send("🚀 Leetlytics Backend is Running");
 });
 
-app.get("/u/:username", (req, res) => {
+function escapeHtmlAttribute(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[character]));
+}
+
+app.get("/u/:username", async (req, res) => {
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(req.params.username)) return sendError(res, 400, "INVALID_PROFILE", "Invalid public profile.", false);
-  return res.sendFile(path.join(__dirname, "../frontend/public/index.html"));
+  try {
+    const username = req.params.username;
+    const safeUsername = escapeHtmlAttribute(username);
+    const profileUrl = `https://leetlytics.onrender.com/u/${encodeURIComponent(username)}`;
+    let html = await fs.promises.readFile(path.join(__dirname, "../frontend/public/index.html"), "utf8");
+    html = html
+      .replace(/<title>[^<]*<\/title>/, `<title>${safeUsername} — CodeAtlas public profile</title>`)
+      .replace(/<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="View ${safeUsername}'s public coding progress on CodeAtlas." />`)
+      .replace(/<meta property="og:title" content="[^"]*"\s*\/>/, `<meta property="og:title" content="${safeUsername} — CodeAtlas public profile" />`)
+      .replace(/<meta property="og:description" content="[^"]*"\s*\/>/, `<meta property="og:description" content="View ${safeUsername}'s public coding progress on CodeAtlas." />`)
+      .replace("</head>", `<link rel="canonical" href="${profileUrl}" />\n  <meta property="og:url" content="${profileUrl}" />\n  </head>`);
+    return res.type("html").send(html);
+  } catch (error) {
+    console.error("Public profile page failed:", error);
+    return sendError(res, 500, "PROFILE_PAGE_UNAVAILABLE", "The public profile page could not be loaded.", true);
+  }
 });
 
 app.get("/robots.txt", (_req, res) => {

@@ -169,6 +169,8 @@ Linked accounts default to public for sharing, but signed-in users can change
 visibility with `PATCH /api/accounts/:platform/:username` and
 `{"isPublic":false}`. Private or unlinked profiles return `PROFILE_PRIVATE`.
 The service also exposes `/robots.txt` and `/sitemap.xml`.
+Public profile HTML includes username-specific title, description, canonical,
+and Open Graph URL metadata for social previews.
 
 The shareable SVG endpoint remains available at
 `/card/<username>.svg?theme=dark|light`; usernames are XML-escaped before
