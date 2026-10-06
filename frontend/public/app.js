@@ -66,6 +66,33 @@ if (previewHeatmapCells) {
   ).join("");
 }
 
+function updatePreview(userData, calData, username) {
+  const profile = userData.matchedUser?.profile || {};
+  const analytics = userData.analytics || {};
+  const solved = (analytics.difficulty || []).reduce((sum, item) => sum + Number(item.solved || 0), 0);
+  const contest = analytics.contests?.history || [];
+  const latestRating = contest.length ? contest[contest.length - 1].rating : null;
+  const activeDays = calData?.totalActiveDays ?? "—";
+  const heatmap = analytics.heatmap || [];
+  const cells = heatmap.slice(-84).map(day => {
+    const level = Math.max(0, Math.min(4, Number(day.level) || 0));
+    return `<i class="heat-${level}" title="${Number(day.count || 0)} submissions"></i>`;
+  }).join("");
+
+  document.getElementById("preview-badge").innerHTML = '<span class="live-dot"></span> Live profile';
+  document.getElementById("preview-avatar").textContent = (profile.realName || username).charAt(0).toUpperCase();
+  document.getElementById("preview-username").textContent = profile.realName || username;
+  document.getElementById("preview-subtitle").textContent = `@${username} · LeetCode`;
+  document.getElementById("preview-score").textContent = solved.toLocaleString();
+  document.getElementById("preview-solved").textContent = solved.toLocaleString();
+  document.getElementById("preview-solved-note").textContent = "problems solved";
+  document.getElementById("preview-streak").textContent = `${analytics.streaks?.current || 0} days`;
+  document.getElementById("preview-active-days").textContent = activeDays === "—" ? activeDays : Number(activeDays).toLocaleString();
+  document.getElementById("preview-rating").textContent = latestRating ? Number(latestRating).toLocaleString() : "—";
+  document.getElementById("preview-rating-note").textContent = latestRating ? "Latest contest rating" : "No contest data";
+  if (cells) previewHeatmapCells.innerHTML = cells;
+}
+
 document.querySelectorAll(".example-link").forEach(example => {
   example.addEventListener("click", () => {
     userInput.value = example.dataset.example;
@@ -316,6 +343,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
   const ac = userData.matchedUser.submitStats.acSubmissionNum;
   const ts = userData.matchedUser.submitStats.totalSubmissionNum;
   const profile = userData.matchedUser.profile;
+  updatePreview(userData, calData, username);
 
   const totals  = { easy: aq[1].count, medium: aq[2].count, hard: aq[3].count };
   const solved  = { easy: ac[1].count, medium: ac[2].count, hard: ac[3].count };

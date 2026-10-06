@@ -96,21 +96,21 @@
           <h2 id="preview-title">Your coding journey,<br/><span>in one place.</span></h2>
           <p>See momentum, patterns, and opportunities to improve without switching between tabs.</p>
         </div>
-        <span class="ui-badge"><span class="live-dot"></span> Live profile preview</span>
+        <span class="ui-badge" id="preview-badge"><span class="live-dot"></span> Example preview</span>
       </div>
       <div class="preview-card">
         <div class="preview-profile">
-          <div class="preview-avatar">A</div>
-          <div><strong>alex.dev</strong><span>Software engineer · 4 platforms</span></div>
-          <span class="preview-score">8.6 <small>coding score</small></span>
+          <div class="preview-avatar" id="preview-avatar">?</div>
+          <div><strong id="preview-username">Search a profile</strong><span id="preview-subtitle">Your live coding metrics will appear here</span></div>
+          <span class="preview-score"><span id="preview-score">—</span> <small>coding score</small></span>
         </div>
         <div class="preview-stats">
-          <div><span>Total solved</span><strong>1,248</strong><small>+36 this month</small></div>
-          <div><span>Current streak</span><strong>18 days</strong><small>Personal best</small></div>
-          <div><span>Active days</span><strong>142</strong><small>Last 6 months</small></div>
-          <div><span>Contest rating</span><strong>1,842</strong><small>Top 8%</small></div>
+          <div><span>Total solved</span><strong id="preview-solved">—</strong><small id="preview-solved-note">LeetCode</small></div>
+          <div><span>Current streak</span><strong id="preview-streak">—</strong><small>Current streak</small></div>
+          <div><span>Active days</span><strong id="preview-active-days">—</strong><small>Tracked activity</small></div>
+          <div><span>Contest rating</span><strong id="preview-rating">—</strong><small id="preview-rating-note">No contest data</small></div>
         </div>
-        <div class="preview-heatmap" aria-label="Sample activity heatmap">
+        <div class="preview-heatmap" aria-label="Profile activity heatmap">
           <span class="preview-heatmap-title">Activity across platforms</span>
           <div id="preview-heatmap-cells"></div>
         </div>
