@@ -804,11 +804,19 @@ compareBtn.addEventListener("click", async () => {
     return;
   }
   setLoading(true);
+  compareBtn.disabled = true;
   results.innerHTML = `<div class="skeleton-section">Loading comparison…</div>`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const response = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(first)}/${encodeURIComponent(second)}`);
-    const data = await response.json();
+    const response = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(first)}/${encodeURIComponent(second)}`, {
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || data.error || "Unable to compare profiles.");
+    if (!Array.isArray(data.users) || data.users.length !== 2) {
+      throw new Error("The comparison response was incomplete. Please try again.");
+    }
     const [firstUser, secondUser] = data.users;
     const winner = (a, b, key) => Number(a[key] || 0) >= Number(b[key] || 0) ? "winner" : "";
     results.innerHTML = `
@@ -826,8 +834,13 @@ compareBtn.addEventListener("click", async () => {
       </div>
       </div>`;
   } catch (error) {
-    results.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="err-msg">${escapeHTML(error.message)}</div></div>`;
+    const message = error.name === "AbortError"
+      ? "Comparison timed out. LeetCode may be waking up or unavailable; please try again."
+      : error.message;
+    results.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="err-msg">${escapeHTML(message)}</div></div>`;
   } finally {
+    clearTimeout(timeout);
+    compareBtn.disabled = false;
     setLoading(false);
   }
 });

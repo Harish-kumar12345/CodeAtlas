@@ -119,6 +119,8 @@ const CALENDAR_QUERY = `
 // ── Helper ───────────────────────────────────────────────────────────────────
 async function leetcodeQuery(query, variables) {
   let res;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     res = await fetch(LEETCODE_URL, {
       method: "POST",
@@ -128,10 +130,13 @@ async function leetcodeQuery(query, variables) {
         "User-Agent": "Mozilla/5.0",
       },
       body: JSON.stringify({ query, variables }),
+      signal: controller.signal,
     });
   } catch (error) {
-    error.code = "LEETCODE_UNAVAILABLE";
+    error.code = error.name === "AbortError" ? "LEETCODE_TIMEOUT" : "LEETCODE_UNAVAILABLE";
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
   if (!res.ok) {
     const error = new Error(`LeetCode returned ${res.status}`);
@@ -158,6 +163,12 @@ function sendUpstreamError(res, error) {
     return res.status(503).json({
       error: "LeetCode is rate limiting requests",
       message: "LeetCode is temporarily limiting requests. Please try again shortly.",
+    });
+  }
+  if (error.code === "LEETCODE_TIMEOUT") {
+    return res.status(504).json({
+      error: "LeetCode request timed out",
+      message: "LeetCode is taking too long to respond. Please try again shortly.",
     });
   }
   return res.status(502).json({
