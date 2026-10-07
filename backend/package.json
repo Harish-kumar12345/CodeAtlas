@@ -9,6 +9,7 @@
     "test": "node --test analytics.test.js auth.test.js cache.test.js database.test.js engagement.test.js linked-accounts.test.js platforms.test.js report.test.js"
   },
   "dependencies": {
+    "argon2": "^0.45.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",

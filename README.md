@@ -215,3 +215,11 @@ Snapshots use SQLite by default at `backend/data/leetmatric.sqlite`. Render's fr
 filesystem is ephemeral, so local snapshots can be lost during redeploys or service
 restarts. Set `DB_PATH` to a persistent mounted path where available, or migrate the
 repository module in `backend/database.js` to PostgreSQL for durable production history.
+
+## Authentication & Authorization (Purely Additive)
+
+LeetMatric includes a comprehensive, security-first authentication system controlled by the `AUTH_ENABLED` feature flag.
+
+- **Feature Flag**: Set `AUTH_ENABLED=true` in environment to enable email+password, Google OAuth, GitHub OAuth, personal dashboard, and session management.
+- **Detailed Documentation**: See [AUTH.md](file:///c:/Users/HP/Downloads/leetmatric/leetmatric/AUTH.md) for full architecture, sequence diagrams, environment variable reference, threat model, and Render deployment callback URLs.
+

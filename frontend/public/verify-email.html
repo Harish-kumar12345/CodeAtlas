@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verifying Email — CodeAtlas</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237567f8'/%3E%3Cpath fill='white' d='M8 8h7v7H8zm9 0h7v7h-7zM8 17h7v7H8zm9 0h7v7h-7z'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .auth-card {
+      max-width: 440px;
+      margin: 5rem auto;
+      padding: 2.5rem 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      text-align: center;
+      animation: fadeDown 0.4s ease both;
+    }
+    .auth-title { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .auth-sub { color: var(--text2); font-size: 0.92rem; margin-bottom: 1.8rem; line-height: 1.5; }
+    .auth-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1.6rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background var(--transition-fast);
+    }
+    .auth-btn:hover { background: var(--accent2); }
+  </style>
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <div class="page-wrapper">
+    <header class="site-header">
+      <a href="/" style="text-decoration: none;" class="logo-group">
+        <div class="logo-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="2" width="11" height="11" rx="3" fill="#7c6aff"/>
+            <rect x="15" y="2" width="11" height="11" rx="3" fill="#7c6aff" opacity=".5"/>
+            <rect x="2" y="15" width="11" height="11" rx="3" fill="#7c6aff" opacity=".5"/>
+            <rect x="15" y="15" width="11" height="11" rx="3" fill="#7c6aff" opacity=".25"/>
+          </svg>
+        </div>
+        <span class="logo-text">CodeAtlas</span>
+      </a>
+      <div class="header-actions">
+        <a href="/" class="header-link">← Home</a>
+      </div>
+    </header>
+
+    <main>
+      <div class="auth-card">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">✉️</div>
+        <h1 class="auth-title">Verify your email</h1>
+        <p class="auth-sub" id="status-text">We sent a verification link to your email address. Please click the link in your inbox to verify your account.</p>
+        <a href="/settings.html" class="auth-btn">Go to Dashboard</a>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -91,6 +91,13 @@ app.use((req, res, next) => {
   next();
 });
 
+if (process.env.AUTH_ENABLED === "true") {
+  const authModule = require("./auth/index");
+  app.use(authModule.sessionMiddleware);
+  app.use("/auth", authModule.routes);
+  app.use("/api/auth", authModule.routes);
+}
+
 function sendError(res, status, code, message, retryable = false) {
   return res.status(status).json({ code, message, retryable });
 }

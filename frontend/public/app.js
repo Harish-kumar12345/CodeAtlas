@@ -25,6 +25,36 @@ let selectedPlatform = "leetcode";
 
 async function loadAuthState() {
   try {
+    const authRes = await fetch("/api/auth/me");
+    if (authRes.ok) {
+      const authData = await authRes.json();
+      if (authSignIn) authSignIn.hidden = true;
+      if (authUser) authUser.hidden = true;
+      if (authLogout) authLogout.hidden = true;
+      if (authDelete) authDelete.hidden = true;
+
+      const slot = document.getElementById("auth-nav-slot");
+      if (slot) {
+        if (authData.user) {
+          const name = authData.user.displayName || authData.user.email.split("@")[0];
+          slot.innerHTML = `
+            <a href="/settings.html" class="theme-toggle" id="nav-avatar-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;"></span>
+              <span>${name.replace(/[&<>"']/g, '')}</span>
+            </a>
+          `;
+        } else {
+          slot.innerHTML = `
+            <a href="/login.html" class="header-link" id="nav-sign-in">Sign in</a>
+            <a href="/register.html" class="theme-toggle" id="nav-sign-up" style="text-decoration:none;">Sign up</a>
+          `;
+        }
+      }
+      return;
+    }
+  } catch {}
+
+  try {
     const response = await fetch("/api/me");
     const data = await response.json();
     if (!response.ok || !data.user) return;
