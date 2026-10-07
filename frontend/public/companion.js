@@ -17,12 +17,12 @@
     let container = document.getElementById("dashboard-companion-shelf");
     if (!container) {
       const resultsEl = document.getElementById("results");
-      if (!resultsEl) return null;
+      if (!resultsEl || !resultsEl.parentNode) return null;
       container = document.createElement("div");
       container.id = "dashboard-companion-shelf";
       container.className = "dashboard-shell";
       container.style.marginTop = "1.5rem";
-      resultsEl.appendChild(container);
+      resultsEl.parentNode.insertBefore(container, resultsEl.nextSibling);
     }
     return container;
   }
@@ -299,25 +299,37 @@
     const hasAnyFlag = Object.values(activeFlags).some(Boolean);
     if (!hasAnyFlag) return; // Zero layout shift when all flags are off
 
-    // Wait for main dashboard to render, then attach
-    const observer = new MutationObserver(() => {
+    function checkAndMount() {
       const resultsEl = document.getElementById("results");
-      if (resultsEl && resultsEl.children.length > 0) {
-        observer.disconnect();
-        const container = getOrCreateCompanionContainer();
-        if (container) {
+      const hasDashboard = resultsEl && (resultsEl.querySelector(".profile-card") || resultsEl.querySelector(".platform-profile-card"));
+      let container = document.getElementById("dashboard-companion-shelf");
+
+      if (hasDashboard) {
+        if (!container) {
+          container = getOrCreateCompanionContainer();
+        }
+        if (container && !container.dataset.mounted) {
+          container.dataset.mounted = "true";
+          container.innerHTML = "";
           mountRevision(container);
           mountContests(container);
           mountBadges(container);
           mountMock(container);
         }
+      } else if (container && resultsEl && resultsEl.querySelector(".skeleton-section")) {
+        // Hide while loading a new search
+        container.style.display = "none";
+      } else if (container && hasDashboard) {
+        container.style.display = "";
       }
-    });
+    }
 
     const targetNode = document.getElementById("results");
     if (targetNode) {
+      const observer = new MutationObserver(checkAndMount);
       observer.observe(targetNode, { childList: true, subtree: true });
     }
+    checkAndMount();
   }
 
   if (document.readyState === "loading") {
