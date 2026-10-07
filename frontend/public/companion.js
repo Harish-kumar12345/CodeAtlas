@@ -1,0 +1,328 @@
+// frontend/public/companion.js - Daily Prep Companion Frontend Progressive Enhancement
+(function () {
+  let activeFlags = {};
+
+  async function checkFlags() {
+    try {
+      const res = await fetch("/api/features");
+      if (res.ok) {
+        activeFlags = await res.json();
+      }
+    } catch {
+      activeFlags = {};
+    }
+  }
+
+  function getOrCreateCompanionContainer() {
+    let container = document.getElementById("dashboard-companion-shelf");
+    if (!container) {
+      const resultsEl = document.getElementById("results");
+      if (!resultsEl) return null;
+      container = document.createElement("div");
+      container.id = "dashboard-companion-shelf";
+      container.className = "dashboard-shell";
+      container.style.marginTop = "1.5rem";
+      resultsEl.appendChild(container);
+    }
+    return container;
+  }
+
+  // 1. Revision List Component
+  async function mountRevision(container) {
+    if (!activeFlags.revision) return;
+    try {
+      const res = await fetch("/api/revision");
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = data.todayItems || [];
+
+      const section = document.createElement("section");
+      section.className = "companion-card";
+      section.id = "companion-revision-section";
+      section.innerHTML = `
+        <div class="companion-header">
+          <div class="companion-title">
+            <span>🧠</span> Revise Today (${items.length})
+          </div>
+          <span class="companion-badge">Spaced Repetition</span>
+        </div>
+        ${items.length === 0 ? `
+          <div class="muted" style="padding:1rem 0;">All caught up! No problems due for review today. Add one below to start your recall cycle.</div>
+        ` : `
+          <div class="companion-grid">
+            ${items.map(item => `
+              <div class="companion-item" id="rev-${item.id}">
+                <div style="font-weight:700;font-size:0.95rem;">${item.problem_title}</div>
+                <div style="font-size:0.75rem;color:var(--text2);">${item.topic || "DSA"} · <span class="tag-${(item.difficulty || "medium").toLowerCase()}">${item.difficulty}</span></div>
+                <div style="font-size:0.72rem;color:var(--text3);">Interval: ${item.interval_days}d · Reps: ${item.repetitions}</div>
+                <div class="companion-actions">
+                  <button class="companion-btn-sm easy" data-rev-id="${item.id}" data-rating="easy">Easy</button>
+                  <button class="companion-btn-sm medium" data-rev-id="${item.id}" data-rating="medium">Medium</button>
+                  <button class="companion-btn-sm hard" data-rev-id="${item.id}" data-rating="hard">Hard</button>
+                  <a href="https://leetcode.com/problems/${item.problem_slug}/" target="_blank" rel="noopener" class="companion-btn-sm">Solve ↗</a>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `}
+        <div style="margin-top:1.25rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <input id="manual-rev-slug" placeholder="Problem slug (e.g. coin-change)" style="padding:0.4rem 0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.8rem;flex:1;min-width:200px;" />
+          <button id="manual-rev-btn" class="dashboard-action primary" style="font-size:0.78rem;padding:0.4rem 0.85rem;">Add to Revision</button>
+        </div>
+      `;
+
+      container.appendChild(section);
+
+      // Event listeners for reviews
+      section.querySelectorAll("[data-rev-id]").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          const id = e.currentTarget.dataset.revId;
+          const rating = e.currentTarget.dataset.rating;
+          try {
+            const reviewRes = await fetch(`/api/revision/${id}/review`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ recallRating: rating }),
+            });
+            if (reviewRes.ok) {
+              const card = document.getElementById(`rev-${id}`);
+              if (card) {
+                card.style.opacity = "0.5";
+                card.innerHTML = `<span style="color:var(--success);font-weight:600;font-size:0.8rem;">✓ Marked as ${rating}! Next review scheduled.</span>`;
+              }
+            }
+          } catch {}
+        });
+      });
+
+      // Manual add
+      document.getElementById("manual-rev-btn")?.addEventListener("click", async () => {
+        const input = document.getElementById("manual-rev-slug");
+        const slug = input.value.trim().toLowerCase();
+        if (!slug) return;
+        try {
+          const addRes = await fetch("/api/revision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ problemSlug: slug, problemTitle: slug.replace(/-/g, " ") }),
+          });
+          if (addRes.ok) {
+            input.value = "";
+            location.reload();
+          }
+        } catch {}
+      });
+    } catch {}
+  }
+
+  // 2. Upcoming Contests Component
+  async function mountContests(container) {
+    if (!activeFlags.contests) return;
+    try {
+      const res = await fetch("/api/contests");
+      if (!res.ok) return;
+      const data = await res.json();
+      const contests = (data.contests || []).slice(0, 4);
+
+      const section = document.createElement("section");
+      section.className = "companion-card";
+      section.id = "companion-contests-section";
+      section.innerHTML = `
+        <div class="companion-header">
+          <div class="companion-title">
+            <span>⚔️</span> Upcoming Contests
+          </div>
+          <span class="companion-badge">Live Countdown</span>
+        </div>
+        ${contests.length === 0 ? `
+          <div class="muted" style="padding:1rem 0;">No upcoming contests detected right now.</div>
+        ` : `
+          <div class="companion-grid">
+            ${contests.map(c => {
+              const start = new Date(c.startTime);
+              return `
+                <div class="companion-item">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="platform-badge ${c.platform.toLowerCase()}" style="font-size:0.65rem;">${c.platform}</span>
+                    <span style="font-size:0.72rem;color:var(--text3);">${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <strong style="font-size:0.9rem;margin-top:0.25rem;">${c.name}</strong>
+                  <div class="companion-actions" style="margin-top:auto;">
+                    <a href="${c.url}" target="_blank" rel="noopener" class="companion-btn-sm">Enter Arena ↗</a>
+                    <a href="${c.googleCalendarUrl}" target="_blank" rel="noopener" class="companion-btn-sm">+ Google Cal</a>
+                    <a href="/api/contests/${c.id}/ics" class="companion-btn-sm">.ICS</a>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `}
+      `;
+      container.appendChild(section);
+    } catch {}
+  }
+
+  // 3. Badges & XP Component
+  async function mountBadges(container) {
+    if (!activeFlags.badges) return;
+    try {
+      const res = await fetch("/api/badges");
+      if (!res.ok) return;
+      const data = await res.json();
+      const xp = data.xp || { level: 1, totalXP: 0, percentage: 0 };
+      const badges = data.badges || data.definitions || [];
+
+      const section = document.createElement("section");
+      section.className = "companion-card";
+      section.id = "companion-badges-section";
+      section.innerHTML = `
+        <div class="companion-header">
+          <div class="companion-title">
+            <span>🏆</span> Level & Milestone Badges
+          </div>
+          <span class="companion-badge">Level ${xp.level || 1} (${xp.totalXP || 0} XP)</span>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text2);">
+            <span>Level Progress</span>
+            <span>${xp.percentage || 0}%</span>
+          </div>
+          <div class="xp-bar-wrap">
+            <div class="xp-bar-fill" style="width: ${xp.percentage || 0}%;"></div>
+          </div>
+        </div>
+        <div class="badges-row">
+          ${badges.map(b => `
+            <div class="badge-pill ${b.earned ? "" : "locked"}" title="${b.description || ""}">
+              <span>${b.icon || "🏅"}</span>
+              <strong>${b.name}</strong>
+            </div>
+          `).join("")}
+        </div>
+      `;
+      container.appendChild(section);
+    } catch {}
+  }
+
+  // 4. Mock Interview Component
+  async function mountMock(container) {
+    if (!activeFlags.mock) return;
+    const section = document.createElement("section");
+    section.className = "companion-card";
+    section.id = "companion-mock-section";
+    section.innerHTML = `
+      <div class="companion-header">
+        <div class="companion-title">
+          <span>⏱️</span> Mock Interview Arena
+        </div>
+        <span class="companion-badge">Timed Practice</span>
+      </div>
+      <p style="font-size:0.82rem;color:var(--text2);margin:0 0 1rem;">Simulate a real coding interview under time pressure with 2 targeted problems.</p>
+      <div id="mock-arena-content" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select id="mock-diff-select" style="padding:0.45rem 0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.8rem;">
+          <option value="Easy">Easy (Warmup)</option>
+          <option value="Medium" selected>Medium (Standard)</option>
+          <option value="Hard">Hard (Challenging)</option>
+        </select>
+        <select id="mock-dur-select" style="padding:0.45rem 0.75rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.8rem;">
+          <option value="30">30 minutes</option>
+          <option value="45" selected>45 minutes</option>
+          <option value="60">60 minutes</option>
+        </select>
+        <button id="mock-start-btn" class="dashboard-action primary" style="font-size:0.8rem;padding:0.45rem 1rem;">Start Mock Session</button>
+      </div>
+      <div id="mock-active-panel" hidden style="margin-top:1rem;"></div>
+    `;
+    container.appendChild(section);
+
+    document.getElementById("mock-start-btn")?.addEventListener("click", async () => {
+      const diff = document.getElementById("mock-diff-select").value;
+      const dur = document.getElementById("mock-dur-select").value;
+      try {
+        const res = await fetch("/api/mock/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetDifficulty: diff, durationMinutes: dur }),
+        });
+        if (res.status === 401) {
+          alert("Please sign in to save mock interview sessions.");
+          return;
+        }
+        if (res.ok) {
+          const data = await res.json();
+          renderActiveMock(data.session);
+        }
+      } catch {}
+    });
+
+    function renderActiveMock(session) {
+      const panel = document.getElementById("mock-active-panel");
+      if (!panel) return;
+      panel.hidden = false;
+      panel.innerHTML = `
+        <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius);border:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+            <strong>Mock Session in Progress</strong>
+            <span class="mock-timer" id="mock-clock">45:00</span>
+          </div>
+          <div style="display:grid;gap:0.5rem;">
+            ${(session.problems || []).map(p => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;background:var(--surface);border-radius:var(--radius-sm);">
+                <div>
+                  <strong>${p.problem_title}</strong>
+                  <span style="font-size:0.75rem;color:var(--text2);margin-left:0.5rem;">(${p.difficulty})</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <a href="${p.url}" target="_blank" rel="noopener" class="companion-btn-sm">Open Problem ↗</a>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <button id="mock-finish-btn" class="dashboard-action primary" style="margin-top:1rem;">Complete & View Report</button>
+        </div>
+      `;
+
+      document.getElementById("mock-finish-btn")?.addEventListener("click", async () => {
+        const finRes = await fetch(`/api/mock/sessions/${session.id}/finish`, { method: "POST" });
+        if (finRes.ok) {
+          const finished = await finRes.json();
+          alert(`Mock Interview Complete! Score: ${finished.session.score}%`);
+          location.reload();
+        }
+      });
+    }
+  }
+
+  // Main lifecycle
+  async function init() {
+    await checkFlags();
+    const hasAnyFlag = Object.values(activeFlags).some(Boolean);
+    if (!hasAnyFlag) return; // Zero layout shift when all flags are off
+
+    // Wait for main dashboard to render, then attach
+    const observer = new MutationObserver(() => {
+      const resultsEl = document.getElementById("results");
+      if (resultsEl && resultsEl.children.length > 0) {
+        observer.disconnect();
+        const container = getOrCreateCompanionContainer();
+        if (container) {
+          mountRevision(container);
+          mountContests(container);
+          mountBadges(container);
+          mountMock(container);
+        }
+      }
+    });
+
+    const targetNode = document.getElementById("results");
+    if (targetNode) {
+      observer.observe(targetNode, { childList: true, subtree: true });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();

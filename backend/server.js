@@ -802,6 +802,10 @@ app.get("/api/user/:username/calendar", async (req, res) => {
   }
 });
 
+// ── Daily Prep Companion Features (Purely Additive, Flag-Gated) ───────────────
+const companionFeatures = require("./features/index");
+companionFeatures.init(app);
+
 app.use("/api", (req, res) => {
   sendError(res, 404, "NOT_FOUND", "The requested API endpoint was not found.", false);
 });

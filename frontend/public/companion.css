@@ -1,0 +1,173 @@
+/* frontend/public/companion.css - Daily Prep Companion Component Styles */
+.companion-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  margin-top: 1.25rem;
+  animation: fadeDown 0.4s ease both;
+}
+
+.companion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.companion-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.companion-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--accent2);
+}
+
+.companion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.companion-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color var(--transition-fast);
+}
+
+.companion-item:hover {
+  border-color: var(--accent);
+}
+
+.companion-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.companion-btn-sm {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all var(--transition-fast);
+}
+
+.companion-btn-sm:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+
+.companion-btn-sm.easy {
+  border-color: var(--easy);
+  color: var(--easy);
+}
+
+.companion-btn-sm.easy:hover {
+  background: var(--easy-bg);
+}
+
+.companion-btn-sm.medium {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.companion-btn-sm.medium:hover {
+  background: var(--medium-bg);
+}
+
+.companion-btn-sm.hard {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.companion-btn-sm.hard:hover {
+  background: var(--hard-bg);
+}
+
+.xp-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: var(--surface3);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.badges-row {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.badge-pill.locked {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.mock-timer {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent2);
+}
+
+.hint-box {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text2);
+}

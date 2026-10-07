@@ -40,3 +40,55 @@
 - **Authorization & Access Control**:
   - Central permission layer (`requireAuth`). All private resources filter exclusively by `req.authUser.id` obtained from the validated server session. Client-submitted user IDs are strictly ignored to eliminate IDOR vulnerabilities.
   - Full data export (`GET /auth/export`) and full account deletion (`DELETE /auth/account`).
+
+---
+
+# Daily Prep Companion Architectural Decisions
+
+## Baseline & Isolation Rules
+- **Purely Additive Philosophy**: All new capabilities are implemented in modular subdirectories under `backend/features/` and isolated behind independent feature flags (`FEATURE_REVISION`, `FEATURE_CONTESTS`, `FEATURE_BADGES`, `FEATURE_MOCK`, `FEATURE_HINTS`, `FEATURE_DIGEST`, `FEATURE_NOTES`).
+- **Default Inactive**: All companion flags default to `false`. When disabled, zero routes, jobs, or frontend widgets are mounted, preserving exact byte-for-byte baseline behavior.
+- **Branching**: Developed exclusively on branch `feat/daily-companion`. Never pushed directly to `main`.
+- **Database Non-Interference**: Existing tables (`users`, `linked_accounts`, `snapshots`, `user_goals`, `auth_users`, etc.) remain completely untouched. All companion models use discrete, dedicated tables with idempotent migrations (`002_create_companion_tables.js`) supporting SQLite and PostgreSQL.
+
+## Feature Architectures & Trade-offs
+
+### 1. Spaced Repetition (`FEATURE_REVISION`)
+- **Algorithm Choice**: Modified SuperMemo SM-2/Anki progression with fixed stepping [1, 3, 7, 14, 30 days] adapted for algorithmic problem solving.
+- **State Transition**: Pure function `next_review(state, recallRating, today)`.
+  - `hard`: Resets interval to 1 day; decrements ease factor (minimum 1.3).
+  - `medium`: Advances along the progression; preserves ease factor.
+  - `easy`: Multiplies current interval by ease factor (or jumps to next tier); boosts ease factor.
+- **Data Boundary**: Automatically populates from user's accepted submissions and allows manual entry for problems solved outside the platform.
+
+### 2. Contests Calendar (`FEATURE_CONTESTS`)
+- **Platform Adapters**:
+  - Codeforces: Official REST API (`https://codeforces.com/api/contest.list`).
+  - LeetCode: GraphQL public contest query.
+  - CodeChef: Public contest feed with graceful error boundary.
+- **Resilience**: Independent in-memory caching (45 minutes). Failure of one provider (e.g. CodeChef upstream downtime) does not break other platforms.
+- **Export & Reminders**: Generates compliant RFC 5545 iCalendar (`.ics`) format and one-click Google Calendar web intent URLs.
+
+### 3. Badges, XP & Levels (`FEATURE_BADGES`)
+- **Deterministic Math**: XP curve: `Level(XP) = floor(1 + sqrt(XP / 100))`. Inverse: `XP(Level) = 100 * (Level - 1)^2`.
+- **Idempotency & Recomputability**: XP events are tied to `(user_id, source_type, source_id)` unique keys. Badge awards are evaluated against snapshot and platform metrics without double-crediting.
+- **Stats Card Integration**: Appends optional badges/level banner to SVG card only when `FEATURE_BADGES=true` and `?badges=1` query parameter is explicitly requested.
+
+### 4. Mock Interview Mode (`FEATURE_MOCK`)
+- **Session Lifecycle**: States: `active`, `completed`, `abandoned`.
+- **Timer Persistence**: Session start timestamp stored in database. Elapsed duration computed server-side from `(now - started_at)` so page reload or browser closure does not reset the timer.
+- **Integrity**: Self-reported completion with explicit disclaimer, tracking time spent per problem and weak-topic coverage.
+
+### 5. AI Hint Mode (`FEATURE_HINTS`)
+- **Progressive Disclosure**: Three strict tiers: (1) Nudge, (2) Approach, (3) Pseudo-code outline.
+- **Safety**: Prompt injection defense sanitizes problem input and instructs LLM to NEVER output compilable code. Output scanner verifies response before delivering to user.
+- **Cost Caps**: Tiered in-memory daily quota per user (max 10 hints/day) and global daily cap to protect server resources. Graceful rule-based fallback when LLM is unavailable.
+
+### 6. Weekly Digest Email (`FEATURE_DIGEST`)
+- **Idempotent Dispatch**: Records `digest_history` with unique `(user_id, week_identifier)` preventing duplicate sends.
+- **Opt-in Compliance**: Strictly opt-in via user preferences. One-click HMAC-signed unsubscribe token in email footer.
+- **Cron Architecture**: Includes standalone scheduler script (`backend/features/digest/worker.js`) callable locally or via external cron webhooks for Render free-tier compatibility.
+
+### 7. Problem Notes & Bookmarks (`FEATURE_NOTES`)
+- **Privacy & Ownership**: All notes are private to the creator with strict UUID ownership assertions.
+- **Sanitization**: Markdown sanitized using strict HTML entity escaping and size constraints (max 10KB per note).

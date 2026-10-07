@@ -223,3 +223,45 @@ LeetMatric includes a comprehensive, security-first authentication system contro
 - **Feature Flag**: Set `AUTH_ENABLED=true` in environment to enable email+password, Google OAuth, GitHub OAuth, personal dashboard, and session management.
 - **Detailed Documentation**: See [AUTH.md](file:///c:/Users/HP/Downloads/leetmatric/leetmatric/AUTH.md) for full architecture, sequence diagrams, environment variable reference, threat model, and Render deployment callback URLs.
 
+## Daily Prep Companion (Purely Additive)
+
+LeetMatric includes seven modular companion capabilities designed for daily interview preparation, each isolated behind its own feature flag (default `false`). With all flags disabled, the application behaves identically to the baseline.
+
+### Architecture Overview
+
+```
+                      ┌─────────────────────────────────────────┐
+                      │            LeetMatric Server            │
+                      └────────────────────┬────────────────────┘
+                                           │
+          ┌────────────────────────────────┼────────────────────────────────┐
+          ▼                                ▼                                ▼
+  [FEATURE_REVISION]              [FEATURE_CONTESTS]               [FEATURE_BADGES]
+  Spaced Repetition               Multi-Platform Calendar          XP Curve & Milestones
+  (SM-2, 1/3/7/14/30d)            (CF/LC/CC, .ics export)          (Level, Badges)
+          │                                │                                │
+          ▼                                ▼                                ▼
+  [FEATURE_MOCK]                   [FEATURE_HINTS]                 [FEATURE_NOTES]
+  Timed 45-min Arena              3-Tier Progressive AI Hints      Private Problem Notes
+  (2 problems, timer)             (Safe, no solution leaks)        (Tags, Bookmarks)
+                                           │
+                                           ▼
+                                   [FEATURE_DIGEST]
+                                   Sunday Email Digest
+                                   (Opt-in, Idempotent)
+```
+
+### Feature Flags & Environment Variables
+
+| Variable | Default | Purpose | Data Source & Limits |
+|----------|---------|---------|----------------------|
+| `FEATURE_REVISION` | `false` | Spaced repetition revision list (`GET/POST /api/revision`) | Tracks user solved problems with intervals of 1, 3, 7, 14, 30 days. |
+| `FEATURE_CONTESTS` | `false` | Upcoming contests calendar & `.ics` export | Aggregates Codeforces, LeetCode, CodeChef. 45-min cache. Fault-tolerant. |
+| `FEATURE_BADGES` | `false` | Deterministic badges, XP and level curve | Computed from streaks, problems, and participation. 100% idempotent. |
+| `FEATURE_MOCK` | `false` | Timed 45-minute mock interview session | 2 curated problems, timer persists across refresh/tab close. |
+| `FEATURE_HINTS` | `false` | Progressive 3-level AI hints (Nudge, Approach, Pseudocode) | Zero-leak validation, daily user limit (default 10), rule-based fallback. |
+| `FEATURE_DIGEST` | `false` | Weekly Sunday momentum digest | Opt-in only, idempotent per ISO week, HMAC unsubscribe token. |
+| `FEATURE_NOTES` | `false` | Private problem notes, tags & favourites | Sanitized markdown, max 10KB/note, strict ownership isolation. |
+| `HINTS_DAILY_LIMIT` | `10` | Daily limit for AI hint requests per user | Stored in `ai_hint_usage`. |
+| `DIGEST_CRON_SECRET` | `""` | Secret header for external cron webhook `/api/digest/cron` | For Render free-tier cron integration. |
+
