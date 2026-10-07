@@ -70,7 +70,7 @@ async function getCodeChef(username) {
     const highestRating = data.match(/Highest Rating\s*([\d,]+)/i)?.[1]?.replace(/,/g, "") || null;
     const globalRank = data.match(/class=['"]global-rank['"]>\s*([\d,]+)/i)?.[1] || null;
     const solved = data.match(/Total Problems Solved:\s*([\d,]+)/i)?.[1] || null;
-    const stars = (data.match(/class=["']rating-star["'][\s\S]*?<\/div>/i)?.[0].match(/&#9733;|★/g) || []).length;
+    const stars = (data.match(/class=["']rating-star["'][\s\S]*?<\/div>/i)?.[0]?.match(/&#9733;|★/g) || []).length;
     const hasPublicProfile = /"currentUser"\s*:\s*"[^"]+"/i.test(data);
     return {
       provider: "CodeChef",

@@ -3,3 +3,4 @@ backend/data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+.env

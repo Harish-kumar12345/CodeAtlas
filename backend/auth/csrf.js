@@ -11,6 +11,17 @@ function getCsrfSecret(req) {
   return null;
 }
 
+function appendCookieHeader(res, cookieStr) {
+  const existing = res.getHeader("Set-Cookie");
+  if (!existing) {
+    res.setHeader("Set-Cookie", cookieStr);
+  } else if (Array.isArray(existing)) {
+    res.setHeader("Set-Cookie", [...existing, cookieStr]);
+  } else {
+    res.setHeader("Set-Cookie", [existing, cookieStr]);
+  }
+}
+
 /**
  * Creates or gets the CSRF token for the current request
  */
@@ -29,7 +40,7 @@ function getCsrfToken(req, res) {
       "Max-Age=86400",
     ];
     if (isHttps) flags.push("Secure");
-    res.setHeader("Set-Cookie", flags.join("; "));
+    appendCookieHeader(res, flags.join("; "));
   }
   return csrfCookie;
 }

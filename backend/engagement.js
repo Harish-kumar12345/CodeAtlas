@@ -105,7 +105,8 @@ async function createStudyPlan(profile, recommendations) {
     if (!response.ok) return { source: "rule-based", model: null, plan: fallback };
     const payload = await response.json();
     const raw = payload.choices?.[0]?.message?.content;
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const cleaned = typeof raw === "string" ? raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim() : raw;
+    const parsed = typeof cleaned === "string" ? JSON.parse(cleaned) : cleaned;
     return { source: "ai", model, plan: validateStudyPlan(parsed) || fallback };
   } catch {
     return { source: "rule-based", model: null, plan: fallback };

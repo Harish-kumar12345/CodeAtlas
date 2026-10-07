@@ -20,6 +20,17 @@ function parseCookies(req) {
   return list;
 }
 
+function appendCookieHeader(res, cookieStr) {
+  const existing = res.getHeader("Set-Cookie");
+  if (!existing) {
+    res.setHeader("Set-Cookie", cookieStr);
+  } else if (Array.isArray(existing)) {
+    res.setHeader("Set-Cookie", [...existing, cookieStr]);
+  } else {
+    res.setHeader("Set-Cookie", [existing, cookieStr]);
+  }
+}
+
 function setSessionCookie(req, res, sessionId, rememberMe = false) {
   const maxAgeSeconds = Math.floor((rememberMe ? REMEMBER_ME_ABSOLUTE_MS : DEFAULT_ABSOLUTE_MS) / 1000);
   const isHttps = req.secure || req.get("x-forwarded-proto") === "https" || process.env.NODE_ENV === "production";
@@ -31,7 +42,7 @@ function setSessionCookie(req, res, sessionId, rememberMe = false) {
     `Max-Age=${maxAgeSeconds}`,
   ];
   if (isHttps) flags.push("Secure");
-  res.setHeader("Set-Cookie", flags.join("; "));
+  appendCookieHeader(res, flags.join("; "));
 }
 
 function clearSessionCookie(req, res) {
@@ -45,7 +56,7 @@ function clearSessionCookie(req, res) {
     "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
   ];
   if (isHttps) flags.push("Secure");
-  res.setHeader("Set-Cookie", flags.join("; "));
+  appendCookieHeader(res, flags.join("; "));
 }
 
 /**

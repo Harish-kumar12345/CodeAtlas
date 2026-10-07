@@ -38,15 +38,16 @@ async function loadAuthState() {
         if (authData.user) {
           const name = authData.user.displayName || authData.user.email.split("@")[0];
           slot.innerHTML = `
-            <a href="/settings.html" class="theme-toggle" id="nav-avatar-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;">
+            <a href="/settings.html" class="theme-toggle" id="nav-avatar-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;font-size:0.78rem;">
               <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;"></span>
               <span>${name.replace(/[&<>"']/g, '')}</span>
             </a>
+            <a href="/auth/logout" class="theme-toggle" style="text-decoration:none;font-size:0.75rem;padding:0.35rem 0.65rem;">Log out</a>
           `;
         } else {
           slot.innerHTML = `
-            <a href="/login.html" class="header-link" id="nav-sign-in">Sign in</a>
-            <a href="/register.html" class="theme-toggle" id="nav-sign-up" style="text-decoration:none;">Sign up</a>
+            <a href="/login.html" class="theme-toggle" id="nav-sign-in" style="text-decoration:none;font-weight:600;font-size:0.78rem;padding:0.4rem 0.85rem;">Sign in</a>
+            <a href="/register.html" class="dashboard-action primary" id="nav-sign-up" style="text-decoration:none;padding:0.4rem 0.95rem;font-size:0.78rem;font-weight:600;border-radius:var(--radius-sm);border:none;">Sign up</a>
           `;
         }
       }
@@ -194,31 +195,31 @@ document.querySelectorAll(".example-link").forEach(example => {
     userInput.focus();
     handleSearch();
   });
+});
 
-  document.addEventListener("click", async event => {
-    const link = event.target.closest("[data-dashboard-target]");
-    if (!link) return;
-    const target = document.getElementById(link.dataset.dashboardTarget);
-    if (target) {
-      event.preventDefault();
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      target.setAttribute("tabindex", "-1");
-      target.focus({ preventScroll: true });
-      return;
-    }
-    const username = userInput.value.trim();
-    const validationError = validate(username);
-    if (!validationError) {
-      event.preventDefault();
-      await handleSearch();
-      results.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
+document.addEventListener("click", async event => {
+  const link = event.target.closest("[data-dashboard-target]");
+  if (!link) return;
+  const target = document.getElementById(link.dataset.dashboardTarget);
+  if (target) {
     event.preventDefault();
-    userInput.focus();
-    const platformName = platformSelector?.querySelector(".platform-option.active")?.textContent.trim() || "selected platform";
-    searchHint.textContent = `Search a ${platformName} profile first to open this live section.`;
-  });
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+    return;
+  }
+  const username = userInput.value.trim();
+  const validationError = validate(username);
+  if (!validationError) {
+    event.preventDefault();
+    await handleSearch();
+    results.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  event.preventDefault();
+  userInput.focus();
+  const platformName = platformSelector?.querySelector(".platform-option.active")?.textContent.trim() || "selected platform";
+  searchHint.textContent = `Search a ${platformName} profile first to open this live section.`;
 });
 
 function validate(username) {
@@ -479,9 +480,9 @@ function render(userData, calData, recentData, username, progress = [], recommen
   const profile = userData.matchedUser.profile;
   updatePreview(userData, calData, username);
 
-  const totals  = { easy: aq[1].count, medium: aq[2].count, hard: aq[3].count };
-  const solved  = { easy: ac[1].count, medium: ac[2].count, hard: ac[3].count };
-  const subs    = { all: ts[0].submissions, easy: ts[1].submissions, medium: ts[2].submissions, hard: ts[3].submissions };
+  const totals  = { easy: aq?.[1]?.count ?? 0, medium: aq?.[2]?.count ?? 0, hard: aq?.[3]?.count ?? 0 };
+  const solved  = { easy: ac?.[1]?.count ?? 0, medium: ac?.[2]?.count ?? 0, hard: ac?.[3]?.count ?? 0 };
+  const subs    = { all: ts?.[0]?.submissions ?? 0, easy: ts?.[1]?.submissions ?? 0, medium: ts?.[2]?.submissions ?? 0, hard: ts?.[3]?.submissions ?? 0 };
   const analytics = userData.analytics || {};
   const topics = analytics.topics || [];
   const weakTopics = analytics.weakTopics || [];
@@ -495,7 +496,7 @@ function render(userData, calData, recentData, username, progress = [], recommen
 
   // Profile
   const avatarHTML = profile.userAvatar
-    ? `<img class="profile-avatar" src="${profile.userAvatar}" alt="${username}" loading="lazy" onerror="this.replaceWith(document.createElement('div'))">`
+    ? `<img class="profile-avatar" src="${escapeHTML(profile.userAvatar)}" alt="${escapeHTML(username)}" loading="lazy" onerror="this.replaceWith(document.createElement('div'))">`
     : `<div class="profile-avatar-placeholder">👤</div>`;
 
   // Heatmap
@@ -631,55 +632,61 @@ function render(userData, calData, recentData, username, progress = [], recommen
               <span class="topic-count">${topic.solved}</span>
             </div>`).join("") || `<div class="empty-state">No topic data available.</div>`}
         </div>
-
-        <div class="analytics-section" id="dashboard-readiness">
-          <div class="section-title">// placement readiness</div>
-          <div class="readiness-card">
-            <div class="readiness-score">${readiness.score}<span>/100</span></div>
-            <div class="readiness-copy">
-              <strong>Transparent preparation score</strong>
-              <span>Topics ${readiness.breakdown.topicCoverage || 0}/35 · Difficulty ${readiness.breakdown.difficultyMix || 0}/30 · Consistency ${readiness.breakdown.consistency || 0}/20 · Contest ${readiness.breakdown.contestRating || 0}/15</span>
-            </div>
-          </div>
-          <div class="section-title company-title">// ${escapeHTML(companyPrep.company)} prep guidance</div>
-          <div class="company-prep-note">Approximate guidance, not official hiring data · ${companyPrep.percentage}% topic coverage</div>
-          <div class="company-topic-list">${companyPrep.coverage.map(item => `<span class="${item.covered ? "covered" : "gap"}">${escapeHTML(item.topic)} · ${item.covered ? "covered" : "gap"}</span>`).join("")}</div>
-        </div>
-
-        <div class="analytics-section" id="dashboard-progress">
-          <div class="section-title">// progress history</div>
-          ${progress.length > 1 ? `
-            <div class="progress-chart">
-              <svg viewBox="0 0 600 150" role="img" aria-label="Solved problem growth">
-                <polyline points="${progress.map((entry, index) => {
-                  const max = Math.max(...progress.map(item => item.totalSolved), 1);
-                  const x = (index / (progress.length - 1)) * 580 + 10;
-                  const y = 135 - (entry.totalSolved / max) * 110;
-                  return `${x},${y}`;
-                }).join(" ")}" />
-              </svg>
-            </div>` : `<div class="muted">Daily snapshots will build this chart over time.</div>`}
-        </div>
-
-        <div class="analytics-section" id="dashboard-study">
-          <div class="section-title">// recommended practice</div>
-          <div class="recommendation-list">
-            ${recommendations.map(problem => `<a class="recommendation-item" href="${problem.url}" target="_blank" rel="noopener"><strong>${escapeHTML(problem.title)}</strong><span>${escapeHTML(problem.topic)} · ${escapeHTML(problem.difficulty)}</span></a>`).join("") || `<div class="muted">No recommendations available.</div>`}
-          </div>
-
-          <div class="analytics-section" id="dashboard-platforms">
-            <div class="section-title">// coding profile</div>
-            <div id="platform-summary" class="muted">Loading Codeforces, CodeChef and GitHub…</div>
-            <a class="study-plan-btn export-link" href="/api/user/${encodeURIComponent(username)}/report.pdf">Download PDF report</a>
-          </div>
-          <button class="study-plan-btn" id="study-plan-btn" type="button">Generate 7-day AI study plan</button>
-          <div id="study-plan-output" class="study-plan-output" hidden></div>
-        </div>
         <div class="weak-topics">
           <div class="analytics-label">Focus next</div>
           ${weakTopics.map(topic => `<span class="weak-topic">${escapeHTML(topic)}</span>`).join("") || `<span class="muted">No weak topics found.</span>`}
         </div>
       </div>
+    </div>
+
+    <!-- Placement Readiness -->
+    <div class="analytics-section" id="dashboard-readiness">
+      <div class="section-title">// placement readiness</div>
+      <div class="readiness-card">
+        <div class="readiness-score">${readiness.score}<span>/100</span></div>
+        <div class="readiness-copy">
+          <strong>Transparent preparation score</strong>
+          <span>Topics ${readiness.breakdown.topicCoverage || 0}/35 · Difficulty ${readiness.breakdown.difficultyMix || 0}/30 · Consistency ${readiness.breakdown.consistency || 0}/20 · Contest ${readiness.breakdown.contestRating || 0}/15</span>
+        </div>
+      </div>
+      <div class="section-title company-title" style="margin-top: 1.25rem;">// ${escapeHTML(companyPrep.company)} prep guidance</div>
+      <div class="company-prep-note">Approximate guidance, not official hiring data · ${companyPrep.percentage}% topic coverage</div>
+      <div class="company-topic-list">${companyPrep.coverage.map(item => `<span class="${item.covered ? "covered" : "gap"}">${escapeHTML(item.topic)} · ${item.covered ? "covered" : "gap"}</span>`).join("")}</div>
+    </div>
+
+    <!-- Progress History -->
+    <div class="analytics-section" id="dashboard-progress">
+      <div class="section-title">// progress history</div>
+      ${progress.length > 1 ? `
+        <div class="progress-chart">
+          <svg viewBox="0 0 600 150" role="img" aria-label="Solved problem growth">
+            <polyline points="${progress.map((entry, index) => {
+              const max = Math.max(...progress.map(item => item.totalSolved), 1);
+              const x = (index / (progress.length - 1)) * 580 + 10;
+              const y = 135 - (entry.totalSolved / max) * 110;
+              return `${x},${y}`;
+            }).join(" ")}" />
+          </svg>
+        </div>` : `<div class="muted">Daily snapshots will build this chart over time.</div>`}
+    </div>
+
+    <!-- Recommended Practice -->
+    <div class="analytics-section" id="dashboard-study">
+      <div class="section-title">// recommended practice</div>
+      <div class="recommendation-list">
+        ${recommendations.map(problem => `<a class="recommendation-item" href="${problem.url}" target="_blank" rel="noopener"><strong>${escapeHTML(problem.title)}</strong><span>${escapeHTML(problem.topic)} · ${escapeHTML(problem.difficulty)}</span></a>`).join("") || `<div class="muted">No recommendations available.</div>`}
+      </div>
+      <div style="margin-top: 1rem;">
+        <button class="study-plan-btn" id="study-plan-btn" type="button" style="margin-top: 0;">Generate 7-day AI study plan</button>
+      </div>
+      <div id="study-plan-output" class="study-plan-output" hidden></div>
+    </div>
+
+    <!-- Coding Profile -->
+    <div class="analytics-section" id="dashboard-platforms">
+      <div class="section-title">// coding profile</div>
+      <div id="platform-summary" class="muted">Loading Codeforces, CodeChef and GitHub…</div>
+      <a class="study-plan-btn export-link" href="/api/user/${encodeURIComponent(username)}/report.pdf">Download PDF report</a>
     </div>
 
     <!-- Contest history -->
@@ -794,7 +801,27 @@ async function fetchAll(username) {
       try {
         const response = await fetch(`${API_BASE}/api/user/${username}/study-plan`, { method: "POST" });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || data.error || "Unable to generate a plan.");
+        if (!response.ok) {
+          if (response.status === 401) {
+            output.innerHTML = `
+              <div style="display:flex;flex-direction:column;gap:8px;padding:6px 2px;text-align:left;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:1.15rem;">🔒</span>
+                  <strong style="color:var(--text);font-size:0.95rem;font-family:var(--font-display);">Sign in required for 7-day AI study plan</strong>
+                </div>
+                <p style="color:var(--text2);margin:0;font-size:0.82rem;font-family:var(--font-sans);line-height:1.45;">
+                  Please sign in or create a free account to generate personalized AI study plans and track your goals.
+                </p>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;">
+                  <a href="/login.html" class="dashboard-action primary" style="text-decoration:none;padding:0.45rem 1.1rem;font-size:0.82rem;font-weight:600;border-radius:var(--radius-sm);display:inline-block;">Sign in</a>
+                  <a href="/register.html" class="theme-toggle" style="text-decoration:none;padding:0.45rem 1.1rem;font-size:0.82rem;font-weight:600;border-radius:var(--radius-sm);display:inline-block;">Create free account</a>
+                </div>
+              </div>
+            `;
+            return;
+          }
+          throw new Error(data.message || data.error || "Unable to generate a plan.");
+        }
         output.textContent = `${data.source === "ai" ? "AI-generated plan" : "Rule-based plan"}\n\n${JSON.stringify(data.plan, null, 2)}`;
       } catch (error) {
         output.textContent = error.message;
@@ -809,7 +836,13 @@ async function fetchAll(username) {
     fetch(`${API_BASE}/api/user/${encodeURIComponent(username)}/goal`)
       .then(response => response.json().then(data => ({ ok: response.ok, data })))
       .then(({ ok, data }) => {
-        if (!ok) throw new Error(data.message || data.error || "Unable to load goal.");
+        if (!ok) {
+          if (data.code === "AUTH_REQUIRED") {
+            goalOutput.innerHTML = `No goal set. <a href="/login.html" style="color:var(--accent2);text-decoration:underline;">Sign in</a> to save goals.`;
+            return;
+          }
+          throw new Error(data.message || data.error || "Unable to load goal.");
+        }
         const goal = data.goal || {};
         const goalInput = document.getElementById("daily-goal-input");
         if (goal.dailyTarget) goalInput.value = goal.dailyTarget;
@@ -827,7 +860,13 @@ async function fetchAll(username) {
           body: JSON.stringify({ dailyTarget, remindersEnabled: false }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || data.error || "Unable to save goal.");
+        if (!response.ok) {
+          if (response.status === 401) {
+            goalOutput.innerHTML = `Please <a href="/login.html" style="color:var(--accent2);text-decoration:underline;font-weight:600;">sign in</a> to save your daily goal.`;
+            return;
+          }
+          throw new Error(data.message || data.error || "Unable to save goal.");
+        }
         goalOutput.textContent = `Saved: ${data.goal.dailyTarget} problem${data.goal.dailyTarget === 1 ? "" : "s"} per day`;
       } catch (error) {
         goalOutput.textContent = error.message;

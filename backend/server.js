@@ -1,6 +1,33 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+
+// Load environment variables from .env if present and not already set
+[
+  path.resolve(__dirname, "../.env"),
+  path.resolve(__dirname, ".env"),
+].forEach((envPath) => {
+  if (fs.existsSync(envPath)) {
+    try {
+      const content = fs.readFileSync(envPath, "utf-8");
+      content.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) return;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx !== -1) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          let val = trimmed.slice(eqIdx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (key && process.env[key] === undefined) {
+            process.env[key] = val;
+          }
+        }
+      });
+    } catch {}
+  }
+});
 const cors = require("cors");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
@@ -69,7 +96,7 @@ app.use(cors({
   },
 }));
 app.use(express.json());
-app.use(express.static("../frontend/public"));
+app.use(express.static(path.join(__dirname, "../frontend/public")));
 app.use((req, res, next) => {
   const requestId = req.get("X-Request-ID") || crypto.randomUUID();
   req.requestId = requestId;
@@ -125,11 +152,16 @@ const limiter = rateLimit({
 app.use("/api/", limiter);
 
 function currentUser(req) {
+  if (req.authUser) return { userId: String(req.authUser.id), ...req.authUser };
   return readToken(getCookie(req, "codeatlas_session"));
 }
 
 async function requireUser(req, res, next) {
   try {
+    if (req.authUser) {
+      req.user = req.authUser;
+      return next();
+    }
     const session = currentUser(req);
     if (!session) return sendError(res, 401, "AUTH_REQUIRED", "Please sign in to continue.", false);
     const user = await getUserById(session.userId);
@@ -183,10 +215,19 @@ app.get("/auth/github/callback", async (req, res) => {
 
 app.get("/auth/logout", (req, res) => {
   clearCookie(res, "codeatlas_session");
+  if (process.env.AUTH_ENABLED === "true") {
+    try {
+      const authModule = require("./auth/index");
+      authModule.clearSessionCookie(req, res);
+    } catch {}
+  }
   res.redirect("/");
 });
 
 app.get("/api/me", async (req, res) => {
+  if (req.authUser) {
+    return res.json({ user: req.authUser });
+  }
   const session = currentUser(req);
   if (!session) return res.json({ user: null });
   const user = await getUserById(session.userId);
@@ -195,7 +236,7 @@ app.get("/api/me", async (req, res) => {
 });
 
 app.delete("/api/me", requireUser, async (req, res) => {
-  await deleteUser(req.user.userId);
+  await deleteUser(req.user.id);
   clearCookie(res, "codeatlas_session");
   return res.status(204).send();
 });
@@ -502,12 +543,6 @@ app.get("/api/user/:username/progress", async (req, res) => {
 app.get("/api/user/:username/recommendations", async (req, res) => {
   const { username } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
-  const usageKey = `${req.user.id}:${new Date().toISOString().slice(0, 10)}`;
-  const cacheKey = `${req.user.id}:${username.toLowerCase()}`;
-  const cachedPlan = studyPlanCache.get(cacheKey);
-  if (cachedPlan) return res.json(cachedPlan);
-  const usage = studyPlanUsage.get(usageKey) || 0;
-  if (usage >= STUDY_PLAN_DAILY_LIMIT) return sendError(res, 429, "STUDY_PLAN_LIMIT", "Daily study-plan limit reached. Try again tomorrow.", false);
   try {
     const profile = await loadProfile(username);
     const recentData = await leetcodeQuery(RECENT_QUERY, { username });
@@ -591,6 +626,12 @@ app.get("/api/user/:username/report.pdf", async (req, res) => {
 app.post("/api/user/:username/study-plan", requireUser, async (req, res) => {
   const { username } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,25}$/.test(username)) return res.status(400).json({ error: "Invalid username" });
+  const usageKey = `${req.user.id}:${new Date().toISOString().slice(0, 10)}`;
+  const cacheKey = `${req.user.id}:${username.toLowerCase()}`;
+  const cachedPlan = studyPlanCache.get(cacheKey);
+  if (cachedPlan) return res.json(cachedPlan);
+  const usage = studyPlanUsage.get(usageKey) || 0;
+  if (usage >= STUDY_PLAN_DAILY_LIMIT) return sendError(res, 429, "STUDY_PLAN_LIMIT", "Daily study-plan limit reached. Try again tomorrow.", false);
   try {
     const profile = await loadProfile(username);
     const recommendations = recommendProblems(profile.analytics.weakTopics, profile.analytics.difficulty);

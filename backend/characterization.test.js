@@ -97,6 +97,10 @@ test("anonymous baseline endpoints retain status and response shapes", async () 
   const invalidCalendar = await request("/api/user/bad%20name/calendar");
   assert.equal(invalidCalendar.status, 400);
   assert.deepEqual(invalidCalendar.body, { error: "Invalid username" });
+
+  const invalidRecommendations = await request("/api/user/bad%20name/recommendations");
+  assert.equal(invalidRecommendations.status, 400);
+  assert.deepEqual(invalidRecommendations.body, { error: "Invalid username" });
 });
 
 test("anonymous state-changing private routes remain unauthorized", async () => {
@@ -111,4 +115,12 @@ test("anonymous state-changing private routes remain unauthorized", async () => 
   const leaderboard = await request("/api/groups/demo/leaderboard");
   assert.equal(leaderboard.status, 401);
   assert.deepEqual(Object.keys(leaderboard.body).sort(), ["code", "message", "retryable"]);
+
+  const studyPlan = await request("/api/user/tester/study-plan", { method: "POST" });
+  assert.equal(studyPlan.status, 401);
+  assert.deepEqual(Object.keys(studyPlan.body).sort(), ["code", "message", "retryable"]);
+
+  const deleteMe = await request("/api/me", { method: "DELETE" });
+  assert.equal(deleteMe.status, 401);
+  assert.deepEqual(Object.keys(deleteMe.body).sort(), ["code", "message", "retryable"]);
 });
