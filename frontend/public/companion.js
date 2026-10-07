@@ -259,37 +259,180 @@
       const panel = document.getElementById("mock-active-panel");
       if (!panel) return;
       panel.hidden = false;
-      panel.innerHTML = `
-        <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius);border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-            <strong>Mock Session in Progress</strong>
-            <span class="mock-timer" id="mock-clock">45:00</span>
-          </div>
-          <div style="display:grid;gap:0.5rem;">
-            ${(session.problems || []).map(p => `
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;background:var(--surface);border-radius:var(--radius-sm);">
-                <div>
-                  <strong>${p.problem_title}</strong>
-                  <span style="font-size:0.75rem;color:var(--text2);margin-left:0.5rem;">(${p.difficulty})</span>
-                </div>
-                <div style="display:flex;gap:8px;">
-                  <a href="${p.url}" target="_blank" rel="noopener" class="companion-btn-sm">Open Problem ↗</a>
+
+      let currentSession = session;
+      let remaining = currentSession.timer?.remainingSeconds ?? (currentSession.duration_minutes * 60);
+
+      if (window._mockTimerInterval) clearInterval(window._mockTimerInterval);
+      window._mockTimerInterval = setInterval(() => {
+        const clockEl = document.getElementById("mock-clock");
+        if (remaining <= 0) {
+          clearInterval(window._mockTimerInterval);
+          if (clockEl) clockEl.textContent = "00:00 (Time's Up)";
+          return;
+        }
+        remaining--;
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        if (clockEl) {
+          clockEl.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+        }
+      }, 1000);
+
+      function renderProblemList() {
+        return (currentSession.problems || []).map(p => {
+          const isSolved = p.status === "solved";
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--surface);border-radius:var(--radius-sm);border:1px solid ${isSolved ? 'var(--success)' : 'var(--border)'};gap:10px;flex-wrap:wrap;">
+              <div>
+                <strong>${p.problem_title}</strong>
+                <span style="font-size:0.75rem;color:var(--text2);margin-left:0.5rem;">(${p.difficulty} · ${p.topic})</span>
+                <div style="font-size:0.72rem;margin-top:2px;color:${isSolved ? 'var(--success)' : 'var(--text3)'};">
+                  ${isSolved ? "✅ Marked as Solved" : "⚪ Incomplete"}
                 </div>
               </div>
-            `).join("")}
-          </div>
-          <button id="mock-finish-btn" class="dashboard-action primary" style="margin-top:1rem;">Complete & View Report</button>
-        </div>
-      `;
+              <div style="display:flex;gap:8px;align-items:center;">
+                <a href="${p.url}" target="_blank" rel="noopener" class="companion-btn-sm">Open on LeetCode ↗</a>
+                <button class="companion-btn-sm mock-toggle-btn" data-slug="${p.problem_slug}" data-status="${isSolved ? 'unsolved' : 'solved'}" style="cursor:pointer;padding:0.35rem 0.75rem;border-radius:var(--radius-sm);background:${isSolved ? 'var(--success)' : 'var(--surface2)'};color:${isSolved ? '#fff' : 'var(--text)'};border:1px solid ${isSolved ? 'var(--success)' : 'var(--border2)'};font-weight:600;">
+                  ${isSolved ? "✅ Solved" : "Mark Solved"}
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
 
-      document.getElementById("mock-finish-btn")?.addEventListener("click", async () => {
-        const finRes = await fetch(`/api/mock/sessions/${session.id}/finish`, { method: "POST" });
-        if (finRes.ok) {
-          const finished = await finRes.json();
-          alert(`Mock Interview Complete! Score: ${finished.session.score}%`);
-          location.reload();
-        }
-      });
+      function updatePanelHTML() {
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        panel.innerHTML = `
+          <div style="background:var(--surface2);padding:1.25rem;border-radius:var(--radius);border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px;">
+              <div>
+                <strong style="font-size:0.95rem;">Mock Session in Progress</strong>
+                <div style="font-size:0.72rem;color:var(--text3);margin-top:2px;">Solve problems on LeetCode, then click 'Mark Solved' below before finishing.</div>
+              </div>
+              <span class="mock-timer" id="mock-clock">${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}</span>
+            </div>
+            <div id="mock-problems-container" style="display:grid;gap:0.6rem;margin-top:0.75rem;">
+              ${renderProblemList()}
+            </div>
+            <div style="margin-top:1.25rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <button id="mock-finish-btn" class="dashboard-action primary" style="padding:0.5rem 1.25rem;font-size:0.85rem;">Complete & View Report</button>
+              <span style="font-size:0.72rem;color:var(--text3);">Results are self-reported for mock practice.</span>
+            </div>
+          </div>
+        `;
+        bindEvents();
+      }
+
+      function bindEvents() {
+        panel.querySelectorAll(".mock-toggle-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const slug = btn.getAttribute("data-slug");
+            const newStatus = btn.getAttribute("data-status");
+            btn.disabled = true;
+            btn.textContent = "Updating...";
+            try {
+              const res = await fetch(`/api/mock/sessions/${currentSession.id}/problems/${slug}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                currentSession = data.session;
+                updatePanelHTML();
+              } else {
+                btn.disabled = false;
+                btn.textContent = newStatus === "solved" ? "Mark Solved" : "✅ Solved";
+              }
+            } catch {
+              btn.disabled = false;
+            }
+          });
+        });
+
+        document.getElementById("mock-finish-btn")?.addEventListener("click", async () => {
+          const btn = document.getElementById("mock-finish-btn");
+          if (btn) {
+            btn.disabled = true;
+            btn.textContent = "Calculating Score...";
+          }
+          if (window._mockTimerInterval) clearInterval(window._mockTimerInterval);
+          try {
+            const finRes = await fetch(`/api/mock/sessions/${currentSession.id}/finish`, { method: "POST" });
+            if (finRes.ok) {
+              const finished = await finRes.json();
+              renderMockReport(finished.session);
+            } else {
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Complete & View Report";
+              }
+            }
+          } catch {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Complete & View Report";
+            }
+          }
+        });
+      }
+
+      function renderMockReport(finishedSession) {
+        const solved = (finishedSession.problems || []).filter(p => p.status === "solved").length;
+        const total = finishedSession.problems?.length || 2;
+        const score = finishedSession.score || 0;
+        const feedback = finishedSession.ai_feedback || {};
+
+        panel.innerHTML = `
+          <div style="background:var(--surface2);padding:1.5rem;border-radius:var(--radius);border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:1rem;">
+              <div>
+                <span class="companion-badge" style="background:${score >= 50 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'};color:${score >= 50 ? 'var(--success)' : 'var(--accent)'};font-size:0.8rem;padding:0.3rem 0.8rem;">
+                  Mock Interview Complete
+                </span>
+                <h3 style="margin:0.5rem 0 0.2rem;font-size:1.15rem;">Session Summary</h3>
+                <div style="font-size:0.75rem;color:var(--text3);">Self-reported performance across ${total} problems</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:2.2rem;font-weight:800;color:${score >= 50 ? 'var(--success)' : 'var(--accent)'};line-height:1;">${score}%</div>
+                <div style="font-size:0.75rem;color:var(--text2);margin-top:2px;">${solved}/${total} Problems Solved</div>
+              </div>
+            </div>
+
+            <div style="background:var(--surface);padding:1rem;border-radius:var(--radius-sm);border:1px solid var(--border2);margin-bottom:1rem;">
+              <strong style="font-size:0.85rem;color:var(--text);">AI Readiness Feedback:</strong>
+              <p style="font-size:0.82rem;color:var(--text2);margin:0.35rem 0 0.25rem;line-height:1.5;">${feedback.verdict || "Session finished."}</p>
+              ${feedback.tips ? `<div style="font-size:0.78rem;color:var(--accent2);margin-top:0.25rem;">💡 <em>${feedback.tips}</em></div>` : ""}
+            </div>
+
+            <div style="display:grid;gap:0.5rem;margin-bottom:1.25rem;">
+              ${(finishedSession.problems || []).map(p => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.85rem;background:var(--surface);border-radius:var(--radius-sm);">
+                  <div>
+                    <strong style="font-size:0.88rem;">${p.problem_title}</strong>
+                    <span style="font-size:0.72rem;color:var(--text3);margin-left:0.4rem;">(${p.difficulty} · ${p.topic})</span>
+                  </div>
+                  <span style="font-size:0.78rem;font-weight:600;color:${p.status === 'solved' ? 'var(--success)' : 'var(--text3)'};">
+                    ${p.status === 'solved' ? '✅ Solved' : '❌ Unsolved'}
+                  </span>
+                </div>
+              `).join("")}
+            </div>
+
+            <button id="mock-restart-btn" class="dashboard-action secondary" style="font-size:0.8rem;padding:0.45rem 1rem;">Start Another Mock</button>
+          </div>
+        `;
+
+        document.getElementById("mock-restart-btn")?.addEventListener("click", () => {
+          panel.hidden = true;
+          panel.innerHTML = "";
+        });
+      }
+
+      updatePanelHTML();
     }
   }
 

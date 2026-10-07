@@ -132,8 +132,28 @@ async function getSession(userId, sessionId) {
   const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
   const isExpired = remainingSeconds === 0 && session.status === "active";
 
+  let parsedFeedback = null;
+  if (session.ai_feedback) {
+    try {
+      parsedFeedback = typeof session.ai_feedback === "string" ? JSON.parse(session.ai_feedback) : session.ai_feedback;
+    } catch {
+      parsedFeedback = { verdict: String(session.ai_feedback), tips: "" };
+    }
+  }
+
+  let parsedTopics = [];
+  if (session.target_topics) {
+    try {
+      parsedTopics = typeof session.target_topics === "string" ? JSON.parse(session.target_topics) : session.target_topics;
+    } catch {
+      parsedTopics = [];
+    }
+  }
+
   return {
     ...session,
+    ai_feedback: parsedFeedback,
+    target_topics: parsedTopics,
     problems: problems.map((p) => ({
       ...p,
       url: `https://leetcode.com/problems/${p.problem_slug}/`,
