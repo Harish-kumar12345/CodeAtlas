@@ -92,3 +92,37 @@
 ### 7. Problem Notes & Bookmarks (`FEATURE_NOTES`)
 - **Privacy & Ownership**: All notes are private to the creator with strict UUID ownership assertions.
 - **Sanitization**: Markdown sanitized using strict HTML entity escaping and size constraints (max 10KB per note).
+
+---
+
+# Phase 1: Observability, Health & Reliability
+
+## 1. Error Monitoring & Exception Scrubbing (Sentry)
+- **Zero-Dependency Fallback**: Optional integration via `backend/infrastructure/sentry.js`. Activated exclusively when `SENTRY_DSN` is set. If missing or if `@sentry/node` is uninstalled, it degrades to a harmless no-op without crashing the application.
+- **Strict PII & Credential Scrubbing**: In `beforeSend`, all request headers (`cookie`, `authorization`, `x-csrf-token`), request body keys containing `password`, `token`, `secret`, and user email addresses are stripped or replaced with `[REDACTED]`.
+- **Sample Rates & Releases**: Release tagged with `package.json` version; trace sample rate capped at 10% in production to remain within free tier quotas.
+
+## 2. Structured JSON Logging & Correlation IDs
+- **Format**: All logs output single-line structured JSON to stdout for log aggregators (Render, Datadog, CloudWatch).
+- **Correlation**: `X-Request-ID` is extracted from incoming proxy headers or minted via `crypto.randomUUID()`. Propagated to response headers and attached to every log line and downstream error.
+- **Security Scrubber**: Deep recursive scrubber in `logger.js` automatically redacts credentials, passwords, tokens, API keys, and cookie headers.
+- **Log Levels**: Dynamic filtering via `LOG_LEVEL` (`debug`, `info`, `warn`, `error`, default `info`).
+
+## 3. Tiered Health Probes & Operational Endpoints
+- **Liveness (`GET /healthz`)**: Fast, lightweight check verifying node process health and uptime. Zero database or network calls; ideal for orchestrator liveness checks.
+- **Readiness (`GET /readyz`)**: Deep check validating database connectivity, cache state, and upstream circuit health. Returns HTTP 200 when ready or 503 when degraded.
+- **Public Status (`GET /status`)**: Public-facing status monitor. Serves JSON to API monitors and an accessible branded HTML status page when requested by web browsers.
+- **Legacy Compatibility**: Existing `/health` endpoint left completely untouched, ensuring 100% backward compatibility with existing tests and Render configuration.
+- **Rate Limit Bypass**: All health endpoints are mounted before the 30 req/min rate limiter to prevent uptime monitors from being blocked with HTTP 429.
+
+## 4. Upstream Circuit Breaking & Graceful Degradation
+- **Centralized Engine (`backend/infrastructure/resilience.js`)**: State machine (`CLOSED`, `OPEN`, `HALF_OPEN`) tracking consecutive failures (threshold: 3) and cooldown periods (30s).
+- **Exponential Backoff with Full Jitter**: Upstream retries apply jittered backoff `Math.floor(min(maxDelay, baseDelay * 2^attempt) * (0.5 + Math.random() * 0.5))` to avoid thundering herds.
+- **Timeouts**: Every external call (LeetCode, Codeforces, CodeChef, GitHub, Gemini, Resend/Brevo) is wrapped with an `AbortController` timeout (8-12 seconds).
+- **Graceful Degradation Guarantee**: If any third-party provider fails or trips its circuit, the service immediately returns a cached or degraded object (`{ available: false }` or rule-based fallback). One platform's outage NEVER breaks a user's profile view or application flow.
+
+## 5. Maintenance Mode & Branded Error Pages
+- **Maintenance Interceptor**: Controlled by `MAINTENANCE_MODE="true"` env var (default: disabled). Returns HTTP 503 with maintenance messaging or renders `maintenance.html`.
+- **Monitor Whitelist**: Even during maintenance, `/healthz`, `/readyz`, and `/status` remain accessible so external pingers (UptimeRobot, BetterStack) do not trigger false downtime alarms.
+- **Branded Pages**: Added `404.html`, `500.html`, and `maintenance.html` styled using the application's existing CSS tokens (`--surface`, `--border`, `--accent2`, `--font-display`, `--danger`).
+

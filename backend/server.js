@@ -77,6 +77,17 @@ const {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Production Infrastructure (Observability, Health & Resilience)
+const logger = require("./infrastructure/logger");
+const sentry = require("./infrastructure/sentry").initSentry(app);
+const {
+  livenessHandler,
+  readinessHandler,
+  statusHandler,
+  maintenanceMiddleware,
+} = require("./infrastructure/health");
+const { getCircuit } = require("./infrastructure/resilience");
 const profileCache = new TtlCache();
 const endpointCache = new TtlCache();
 const studyPlanCache = new TtlCache();
@@ -97,26 +108,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../frontend/public")));
-app.use((req, res, next) => {
-  const requestId = req.get("X-Request-ID") || crypto.randomUUID();
-  req.requestId = requestId;
-  res.set("X-Request-ID", requestId);
-  res.set("X-Content-Type-Options", "nosniff");
-  res.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.set("X-Frame-Options", "SAMEORIGIN");
-  const startedAt = Date.now();
-  res.on("finish", () => {
-    console.log(JSON.stringify({
-      event: "request",
-      requestId,
-      method: req.method,
-      path: req.path.startsWith("/api") ? "/api" : req.path,
-      status: res.statusCode,
-      durationMs: Date.now() - startedAt,
-    }));
-  });
-  next();
-});
+app.use(logger.middleware());
+app.use(sentry.requestHandler());
+app.use(maintenanceMiddleware);
 
 if (process.env.AUTH_ENABLED === "true") {
   const authModule = require("./auth/index");
@@ -137,6 +131,11 @@ app.get("/health", (_req, res) => {
     upstream: circuitOpen ? "open" : "available",
   });
 });
+
+// Liveness, Readiness & Status Probes
+app.get("/healthz", livenessHandler);
+app.get("/readyz", readinessHandler);
+app.get("/status", statusHandler);
 
 // Rate limiter: max 30 requests per minute per IP
 const limiter = rateLimit({
@@ -383,6 +382,7 @@ async function leetcodeQuery(query, variables) {
         }
         circuit.failures = 0;
         circuit.openedAt = 0;
+        getCircuit("leetcode").recordSuccess();
         return payload;
       }
       const error = new Error(`LeetCode returned ${res.status}`);
@@ -396,6 +396,7 @@ async function leetcodeQuery(query, variables) {
         if (retryable) {
           circuit.failures += 1;
           if (circuit.failures >= CIRCUIT_FAILURE_LIMIT) circuit.openedAt = Date.now();
+          getCircuit("leetcode").recordFailure();
         }
         throw error;
       }
@@ -810,9 +811,28 @@ app.use("/api", (req, res) => {
   sendError(res, 404, "NOT_FOUND", "The requested API endpoint was not found.", false);
 });
 
+// Non-API 404 fallback: serve 404.html if html is requested
+app.use((req, res, next) => {
+  if (req.accepts("html")) {
+    const page404 = path.join(__dirname, "../frontend/public/404.html");
+    if (fs.existsSync(page404)) {
+      return res.status(404).sendFile(page404);
+    }
+  }
+  res.status(404).send("Not Found");
+});
+
+app.use(sentry.errorHandler());
+
 app.use((error, req, res, _next) => {
-  console.error(JSON.stringify({ event: "request_failed", requestId: req.requestId, error: error.message }));
+  logger.error("request_failed", error.message, { requestId: req.requestId, stack: error.stack });
   if (res.headersSent) return;
+  if (req.accepts("html") && !req.path.startsWith("/api/")) {
+    const page500 = path.join(__dirname, "../frontend/public/500.html");
+    if (fs.existsSync(page500)) {
+      return res.status(500).sendFile(page500);
+    }
+  }
   sendError(res, 500, "INTERNAL_ERROR", "The server could not complete that request.", false);
 });
 

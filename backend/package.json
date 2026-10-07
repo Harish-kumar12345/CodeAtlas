@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "test": "node --test analytics.test.js auth.test.js cache.test.js database.test.js engagement.test.js linked-accounts.test.js platforms.test.js report.test.js",
     "test:companion": "node --test features/**/*.test.js",
-    "test:all": "npm test && npm run test:companion && node --test characterization.test.js auth.system.test.js"
+    "test:all": "npm test && npm run test:companion && node --test characterization.test.js auth.system.test.js resilience.test.js"
   },
   "dependencies": {
     "argon2": "^0.45.1",

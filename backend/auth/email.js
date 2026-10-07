@@ -1,4 +1,5 @@
 const fetch = require("node-fetch");
+const { execute } = require("../infrastructure/resilience");
 const { randomToken, hashToken } = require("./crypto");
 const authDb = require("./db");
 
@@ -43,49 +44,57 @@ async function sendEmail({ to, subject, html, text }) {
   const from = process.env.EMAIL_FROM || "LeetMatric <noreply@leetlytics.onrender.com>";
 
   if (provider === "resend" && apiKey) {
-    try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ from, to, subject, html, text }),
-      });
-      if (!response.ok) {
-        console.error("Resend delivery failed:", await response.text());
+    return execute("email", async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ from, to, subject, html, text }),
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          console.error("Resend delivery failed:", await response.text());
+        }
+        return response.ok;
+      } finally {
+        clearTimeout(timer);
       }
-      return response.ok;
-    } catch (error) {
-      console.error("Resend request error:", error);
-      return false;
-    }
+    }, () => false);
   }
 
   if (provider === "brevo" && apiKey) {
-    try {
-      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sender: { email: from.includes("<") ? from.split("<")[1].replace(">", "").trim() : from, name: "LeetMatric" },
-          to: [{ email: to }],
-          subject,
-          htmlContent: html,
-          textContent: text,
-        }),
-      });
-      if (!response.ok) {
-        console.error("Brevo delivery failed:", await response.text());
+    return execute("email", async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sender: { email: from.includes("<") ? from.split("<")[1].replace(">", "").trim() : from, name: "LeetMatric" },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+            textContent: text,
+          }),
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          console.error("Brevo delivery failed:", await response.text());
+        }
+        return response.ok;
+      } finally {
+        clearTimeout(timer);
       }
-      return response.ok;
-    } catch (error) {
-      console.error("Brevo request error:", error);
-      return false;
-    }
+    }, () => false);
   }
 
   // Development fallback: Print to console
@@ -158,4 +167,5 @@ module.exports = {
   generateEmailToken,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendEmail,
 };

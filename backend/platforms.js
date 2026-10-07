@@ -1,7 +1,18 @@
 const fetch = require("node-fetch");
+const { execute } = require("./infrastructure/resilience");
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function getJson(url, headers = {}) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       Accept: "application/json",
       "User-Agent": "CodeAtlas/1.0 (+https://leetlytics.onrender.com)",
@@ -18,7 +29,7 @@ async function getJson(url, headers = {}) {
 }
 
 async function getText(url, headers = {}) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       Accept: "text/html",
       "User-Agent": "CodeAtlas/1.0 (+https://leetlytics.onrender.com)",
@@ -34,7 +45,7 @@ async function getText(url, headers = {}) {
 }
 
 async function getCodeforces(username) {
-  try {
+  return execute("codeforces", async () => {
     const [infoData, statusData] = await Promise.all([
       getJson(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(username)}`),
       getJson(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(username)}&from=1&count=10000`),
@@ -58,13 +69,11 @@ async function getCodeforces(username) {
       contribution: user?.contribution || 0,
       friends: user?.friendOfCount || 0,
     };
-  } catch (error) {
-    return { provider: "Codeforces", username, available: false, error: "Profile unavailable" };
-  }
+  }, () => ({ provider: "Codeforces", username, available: false, error: "Profile unavailable" }));
 }
 
 async function getCodeChef(username) {
-  try {
+  return execute("codechef", async () => {
     const data = await getText(`https://www.codechef.com/users/${encodeURIComponent(username)}`);
     const rating = data.match(/class=["']rating-number["'][^>]*>\s*([\d,]+)/i)?.[1]?.replace(/,/g, "") || null;
     const highestRating = data.match(/Highest Rating\s*([\d,]+)/i)?.[1]?.replace(/,/g, "") || null;
@@ -83,51 +92,51 @@ async function getCodeChef(username) {
       stars,
       ...((rating || hasPublicProfile) ? {} : { error: "Profile unavailable or provider format changed" }),
     };
-  } catch (error) {
-    return { provider: "CodeChef", username, available: false, error: "Profile unavailable" };
-  }
+  }, () => ({ provider: "CodeChef", username, available: false, error: "Profile unavailable" }));
 }
 
 async function getGitHub(username) {
-  try {
+  return execute("github", async () => {
     const headers = process.env.GITHUB_TOKEN
       ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
       : {};
-    const user = await getJson(`https://api.github.com/users/${encodeURIComponent(username)}`, headers);
-    return {
-      provider: "GitHub",
-      username,
-      available: true,
-      repositories: user.public_repos,
-      followers: user.followers,
-      following: user.following,
-      publicGists: user.public_gists,
-      profileUrl: user.html_url,
-      contributions: null,
-    };
-  } catch (error) {
     try {
-      const profilePage = await getText(`https://github.com/${encodeURIComponent(username)}`);
-      if (/<title>[^<]*GitHub/i.test(profilePage) && !/Page not found/i.test(profilePage)) {
-        return {
-          provider: "GitHub",
-          username,
-          available: true,
-          repositories: null,
-          followers: null,
-          contributions: null,
-        };
+      const user = await getJson(`https://api.github.com/users/${encodeURIComponent(username)}`, headers);
+      return {
+        provider: "GitHub",
+        username,
+        available: true,
+        repositories: user.public_repos,
+        followers: user.followers,
+        following: user.following,
+        publicGists: user.public_gists,
+        profileUrl: user.html_url,
+        contributions: null,
+      };
+    } catch (error) {
+      try {
+        const profilePage = await getText(`https://github.com/${encodeURIComponent(username)}`);
+        if (/<title>[^<]*GitHub/i.test(profilePage) && !/Page not found/i.test(profilePage)) {
+          return {
+            provider: "GitHub",
+            username,
+            available: true,
+            repositories: null,
+            followers: null,
+            contributions: null,
+          };
+        }
+      } catch {
+        // Fallback check failed
       }
-    } catch {
-      // Preserve the provider-specific error below when the fallback is unavailable.
+      const message = error.status === 403
+        ? "GitHub API rate limit reached"
+        : error.status === 404
+          ? "GitHub profile not found"
+          : "GitHub is temporarily unavailable";
+      return { provider: "GitHub", username, available: false, error: message };
     }
-    const message = error.status === 403
-      ? "GitHub API rate limit reached"
-      : error.status === 404
-        ? "GitHub profile not found"
-        : "GitHub is temporarily unavailable";
-    return { provider: "GitHub", username, available: false, error: message };
-  }
+  }, () => ({ provider: "GitHub", username, available: false, error: "GitHub is temporarily unavailable" }));
 }
 
 async function getPlatformProfiles(username) {
