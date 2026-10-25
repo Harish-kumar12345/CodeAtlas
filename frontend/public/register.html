@@ -302,7 +302,10 @@
           },
           body: JSON.stringify({ displayName, email, password }),
         });
-        const data = await res.json();
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {}
 
         if (res.ok) {
           showAlert("Account created successfully! Redirecting...", "success");

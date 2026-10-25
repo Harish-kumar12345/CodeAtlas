@@ -312,7 +312,10 @@
           },
           body: JSON.stringify({ email, password, rememberMe }),
         });
-        const data = await res.json();
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {}
 
         if (res.ok) {
           showAlert("Sign in successful! Redirecting...", "success");
